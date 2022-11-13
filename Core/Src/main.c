@@ -162,6 +162,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  /* To test GitHUB    */
 	  get_adcs(adc_RAW, &vdd, &temp_MCU, &outU, &outI, constU, constI);
 	  ptr = float_to_char(temp_MCU, float_for_LCD);
  	  LCD_DisplayString(66,111,ptr,&Font16,ORANGE,BLACK);
