@@ -9,6 +9,7 @@
 #define INC_PSU_H_
 
 #include "main.h"
+#include "LCD.h"
 
 #define CHAR_BUFF_SIZE  10
 
@@ -17,5 +18,6 @@ void v_DAC10_Set(uint16_t vDACout);
 void get_adcs(volatile uint16_t adc_RAW[], float *vdd, float *temp_MCU,
 		float *outU,float *outI, float constU, float constI);
 char * float_to_char(float x, char *p);
+void draw_main_st(COLOR backgr, COLOR front);
 
 #endif /* INC_PSU_H_ */

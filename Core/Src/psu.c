@@ -7,6 +7,7 @@
  *      Author: Ivan
  */
 #include "psu.h"
+
 void i_DAC10_Set(uint16_t iDACout)
 {
 	// output bit number 9 set
@@ -149,4 +150,22 @@ char * float_to_char(float x, char *p)
     }
     if (x < 0) *--s = '-'; // unary minus sign for negative numbers
     return s;
+}
+
+void draw_main_st(COLOR backgr, COLOR front)
+{
+	LCD_Clear(backgr);
+	LCD_DrawRectangle (1, 1, 160, 128, front, DRAW_EMPTY, DOT_PIXEL_1X1);
+	LCD_DisplayString(1,1,"00.000V",&Font24,backgr,YELLOW);
+	LCD_DisplayString(1,25," 0.000A",&Font24,backgr,YELLOW);
+	LCD_DisplayString(1,49,"000.00W",&Font24,backgr,YELLOW);
+	LCD_DisplayString(123,4,"OFF",&Font16,RED,WHITE);
+	LCD_DisplayString(123,23," CV",&Font16,GBLUE,BLACK);
+	LCD_DisplayString(123,42," M0",&Font16,CYAN,BLACK);
+	LCD_DisplayString(123,61,"  LGT  ",&Font8,MAGENTA,WHITE);
+	LCD_DisplayString(5,73,"XX.XXXV",&Font16,backgr,front);
+	LCD_DisplayString(89,73,"Y.YYYA",&Font16,backgr,front);
+	LCD_DisplayString(18,89," onT:000d00h00m00s",&Font12,backgr,front);
+	LCD_DisplayString(18,101,"runT:000d00h00m00s",&Font12,backgr,front);
+	LCD_DisplayString(3,114,"MCU temperature",&Font12,backgr,front);
 }

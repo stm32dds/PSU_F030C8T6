@@ -30,6 +30,7 @@
 enum EncStates {NO_TRN, INC_TRN_SLOW, INC_TRN_NORM,INC_TRN_FAST,
 						DEC_TRN_SLOW, DEC_TRN_NORM,DEC_TRN_FAST};
 enum BtnStates {NO_PRESS, FIRST_EDGE, PRESS_NORM, PRESS_LONG};
+enum MenuSelected {ON_OFF,MODE, MEM, BL, U, I};
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -67,7 +68,8 @@ float constU=1.0, constI=1.0; // calibration constants for U&I
 float outU, outI, temp_MCU;
 char float_for_LCD[CHAR_BUFF_SIZE];
 enum EncStates enc = NO_TRN;
-enum BtnStates btn = NO_PRESS;
+enum BtnStates btn = PRESS_NORM;// to activate V menu on start
+enum MenuSelected mnu_sel = BL;
 int16_t enc_cnt = 0;
 uint8_t btn_cnt = 0;
 char* ptr; // Point to converted to char floats for LCD displaying
@@ -85,7 +87,7 @@ static void MX_I2C2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
-
+void menu_handler(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -153,7 +155,7 @@ int main(void)
   __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, lcd_pwm_bl);
 
   LCD_Init( lcd_ScanDir ); // LCD initialization
-  LCD_Clear(BLACK); //fill LCD with main background
+  draw_main_st(BLACK, WHITE); // Main static screen
   HAL_Delay(10); //to get stable readings from ADCs
 
   /* USER CODE END 2 */
@@ -164,9 +166,12 @@ int main(void)
   {
 	  /* To test GitHUB    */
 	  get_adcs(adc_RAW, &vdd, &temp_MCU, &outU, &outI, constU, constI);
+	  if((enc != NO_TRN)||(btn != NO_PRESS)) menu_handler();
 	  ptr = float_to_char(temp_MCU, float_for_LCD);
- 	  LCD_DisplayString(66,111,ptr,&Font16,ORANGE,BLACK);
- 	  LCD_DisplayString((66+11*(sizeof(ptr)+1)),111,"*C",&Font16,ORANGE,BLACK);
+	  ptr[4]=0; // easy way for fast truncate
+ 	  LCD_DisplayString(116,114,ptr,&Font12,ORANGE,BLACK);
+ 	  LCD_DisplayString((116+7*sizeof(ptr)),114,"*C",&Font12,ORANGE,BLACK);
+ /*
  	  ptr = float_to_char(outU, float_for_LCD);
  	  if(outU >= 10) LCD_DisplayString(58,24,ptr,&Font24,BLACK,WHITE);
  	  if((outU < 10)&&(outU >=1))
@@ -194,6 +199,9 @@ int main(void)
 	  {
 		  btn=NO_PRESS;
 	  }
+*/
+	  v_DAC10_Set(0);
+	  i_DAC10_Set(0);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -734,6 +742,83 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) //every 100mS
 
 
         }
+}
+
+void menu_handler(void)
+{
+	if(enc != NO_TRN)
+	{
+		enc=NO_TRN;
+	}
+
+	if(btn != (NO_PRESS || FIRST_EDGE))
+	{
+		if(btn == PRESS_NORM)
+		{
+			switch(mnu_sel)
+			{
+			case ON_OFF: //Power on, off
+			{
+				LCD_DrawRectangle
+					(122, 3, 158, 22, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+				LCD_DrawRectangle
+					(122,22, 158, 41, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+				mnu_sel = MODE;
+				break;
+			}
+			case MODE:  //Constant U or constant I
+			{
+				LCD_DrawRectangle
+					(122,22, 158, 41, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+				LCD_DrawRectangle
+					(122,41, 158, 60, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+				mnu_sel = MEM;
+				break;
+			}
+			case MEM: //Memory settings
+			{
+				LCD_DrawRectangle
+					(122,41, 158, 60, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+				LCD_DrawRectangle
+					(122,60, 158, 71, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+				mnu_sel = BL;
+				break;
+			}
+			case BL: //Back Light setup
+			{
+				LCD_DrawRectangle
+					(122,60, 158, 71, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+				LCD_DrawRectangle
+					(3,73, 85, 87, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+				mnu_sel = U;
+				break;
+			}
+			case U: //Voltage set point
+			{
+				LCD_DrawRectangle
+					(3,73, 85, 87, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+				LCD_DrawRectangle
+					(88,73, 158, 87, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+				mnu_sel = I;
+				break;
+			}
+			case I: //Current set point
+			{
+				LCD_DrawRectangle
+					(88,73, 158, 87, BLACK , DRAW_EMPTY, DOT_PIXEL_2X2);
+				LCD_DrawRectangle
+					(122, 3, 158, 22, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+				mnu_sel = ON_OFF;
+				break;
+			}
+			}
+		}
+		if(btn == PRESS_LONG)
+		{
+			;
+		}
+		btn=NO_PRESS;
+	}
 }
 /* USER CODE END 4 */
 
