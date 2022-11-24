@@ -132,15 +132,17 @@ char * float_to_char(float x, char *p)
     uint16_t decimals;  // variable to store the decimals
     int units;  // variable to store the units (part to left of decimal place)
     if (x < 0) { // take care of negative numbers
-        decimals = (int)(x * -100) % 100; // make 1000 for 3 decimals etc.
+        decimals = (int)(x * -1000) % 1000; // make 1000 for 3 decimals etc.
         units = (int)(-1 * x);
     } else { // positive numbers
-        decimals = (int)(x * 100) % 100;
+        decimals = (int)(x * 1000) % 1000;
         units = (int)x;
     }
 
     *--s = (decimals % 10) + '0';
     decimals /= 10; // repeat for as many decimal places as you need
+    *--s = (decimals % 10) + '0';
+    decimals /= 10; // I want 3 decimals :-)
     *--s = (decimals % 10) + '0';
     *--s = '.';
 
@@ -161,11 +163,11 @@ void draw_main_st(COLOR backgr, COLOR front)
 	LCD_DisplayString(1,49,"000.00W",&Font24,backgr,YELLOW);
 	LCD_DisplayString(123,4,"OFF",&Font16,RED,WHITE);
 	LCD_DisplayString(123,23," CV",&Font16,GBLUE,BLACK);
-	LCD_DisplayString(123,42," M0",&Font16,CYAN,BLACK);
+	LCD_DisplayString(123,42," M0",&Font16,GRAY,BLACK);
 	LCD_DisplayString(123,61,"  LGT  ",&Font8,MAGENTA,WHITE);
-	LCD_DisplayString(5,73,"XX.XXXV",&Font16,backgr,front);
-	LCD_DisplayString(89,73,"Y.YYYA",&Font16,backgr,front);
-	LCD_DisplayString(18,89," onT:000d00h00m00s",&Font12,backgr,front);
-	LCD_DisplayString(18,101,"runT:000d00h00m00s",&Font12,backgr,front);
+	LCD_DisplayString(5,71,"XX.XXXV",&Font16,backgr,front);
+	LCD_DisplayString(89,71,"Y.YYYA",&Font16,backgr,front);
+	LCD_DisplayString(18,90," onT:000d00h00m00s",&Font12,backgr,front);
+	LCD_DisplayString(18,102,"runT:000d00h00m00s",&Font12,backgr,front);
 	LCD_DisplayString(3,114,"MCU temperature",&Font12,backgr,front);
 }

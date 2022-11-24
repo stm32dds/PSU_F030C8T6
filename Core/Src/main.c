@@ -36,7 +36,7 @@ enum MenuSelected {ON_OFF,MODE, MEM, BL, U, I};
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define TRN_SLOW_NORM  4
-#define TRN_NORM_FAST  16
+#define TRN_NORM_FAST  10 //16
 #define NORM_PRESS_TIME  1 // *100 in mS
 #define LONG_PRESS_TIME  5 // *100 in mS
 /* USER CODE END PD */
@@ -53,6 +53,8 @@ DMA_HandleTypeDef hdma_adc;
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
+RTC_HandleTypeDef hrtc;
+
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
@@ -60,7 +62,6 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
-int16_t lcd_pwm_bl = 200; //max value
 LCD_SCAN_DIR lcd_ScanDir = D2U_L2R; //LCD display direction
 volatile uint16_t adc_RAW[4]; //0-ADC-V,2-Temp.ADC, 3-Vref.ADC
 float vdd; //calculated by ADCs OnBoard Voltage
@@ -73,6 +74,12 @@ enum MenuSelected mnu_sel = BL;
 int16_t enc_cnt = 0;
 uint8_t btn_cnt = 0;
 char* ptr; // Point to converted to char floats for LCD displaying
+bool on_off = false; // disable/enable power at output 0/1
+bool mod_sel_CI = false; // constant voltage/constant current 0/1
+int8_t mem_sel = 0; // selected memory set from 0 to 9
+int16_t lcd_pwm_bl = 200; //max value
+float uSP = 5.0; // set point for output voltage
+float iSP = 1.0; // set point for output current
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,6 +93,7 @@ static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 void menu_handler(void);
 /* USER CODE END PFP */
@@ -108,7 +116,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-   HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -131,6 +139,7 @@ int main(void)
   MX_I2C2_Init();
   MX_TIM3_Init();
   MX_TIM6_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   /* Perform ADC calibration */
   if (HAL_ADCEx_Calibration_Start(&hadc) != HAL_OK)
@@ -164,14 +173,14 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  /* To test GitHUB    */
 	  get_adcs(adc_RAW, &vdd, &temp_MCU, &outU, &outI, constU, constI);
 	  if((enc != NO_TRN)||(btn != NO_PRESS)) menu_handler();
+
 	  ptr = float_to_char(temp_MCU, float_for_LCD);
 	  ptr[4]=0; // easy way for fast truncate
  	  LCD_DisplayString(116,114,ptr,&Font12,ORANGE,BLACK);
  	  LCD_DisplayString((116+7*sizeof(ptr)),114,"*C",&Font12,ORANGE,BLACK);
- /*
+/*
  	  ptr = float_to_char(outU, float_for_LCD);
  	  if(outU >= 10) LCD_DisplayString(58,24,ptr,&Font24,BLACK,WHITE);
  	  if((outU < 10)&&(outU >=1))
@@ -222,9 +231,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL12;
@@ -246,8 +256,9 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_RTC;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -425,6 +436,41 @@ static void MX_I2C2_Init(void)
   /* USER CODE BEGIN I2C2_Init 2 */
 
   /* USER CODE END I2C2_Init 2 */
+
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
 
 }
 
@@ -748,6 +794,125 @@ void menu_handler(void)
 {
 	if(enc != NO_TRN)
 	{
+		switch(mnu_sel)
+		{
+		case ON_OFF:
+		{
+			if(enc == INC_TRN_SLOW)
+			{
+				LCD_DisplayString(123,4," ON",&Font16,GREEN,WHITE);
+				on_off = 1;
+			}
+			if(enc == DEC_TRN_SLOW)
+			{
+				LCD_DisplayString(123,4,"OFF",&Font16,RED,WHITE);
+				on_off = 0;
+			}
+			break;
+		}
+		case MODE:
+		{
+			if(enc == INC_TRN_SLOW)
+			{
+				LCD_DisplayString(123,23," CV",&Font16,GBLUE,BLACK);
+				mod_sel_CI = false;
+			}
+			if(enc == DEC_TRN_SLOW)
+			{
+				LCD_DisplayString(123,23," CI",&Font16,BRRED,BLACK);
+				mod_sel_CI = true ;
+			}
+			break;
+		}
+		case MEM:
+		{
+			if(!on_off) //MEM selection only when device is OFF
+			{
+				HAL_Delay(200);
+				if(enc == INC_TRN_SLOW)
+				{
+					mem_sel=mem_sel+1;
+					if (mem_sel > 9) mem_sel=9;
+				}
+				if(enc == DEC_TRN_SLOW)
+				{
+					mem_sel=mem_sel-1;
+					if (mem_sel < 0) mem_sel=0;
+				}
+				float_for_LCD[0]=0x30+mem_sel;
+				float_for_LCD[1]=0;
+				LCD_DisplayString(123,42," M",&Font16,GRAY,BLACK);
+				LCD_DisplayString(145,42,float_for_LCD,&Font16,GRAY,BLACK);
+			}
+			break;
+		}
+		case BL:
+		{
+			if(enc == INC_TRN_SLOW) lcd_pwm_bl = lcd_pwm_bl+1;
+			if(enc == INC_TRN_NORM) lcd_pwm_bl = lcd_pwm_bl+10;
+			if(enc == INC_TRN_FAST) lcd_pwm_bl = lcd_pwm_bl+50;
+			if(enc == DEC_TRN_SLOW) lcd_pwm_bl = lcd_pwm_bl-1;
+			if(enc == DEC_TRN_NORM) lcd_pwm_bl = lcd_pwm_bl-10;
+			if(enc == DEC_TRN_FAST) lcd_pwm_bl = lcd_pwm_bl-50;
+			if (lcd_pwm_bl < 0) lcd_pwm_bl = 0;
+			if (lcd_pwm_bl > 200) lcd_pwm_bl = 200;
+			__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, lcd_pwm_bl);
+			if (lcd_pwm_bl != 200)
+				LCD_DisplayString(123,61,"  LGT  ",&Font8,MAGENTA,WHITE);
+			else
+				LCD_DisplayString(123,61,"LGT-MAX",&Font8,MAGENTA,WHITE);
+			break;
+		}
+		case U:
+		{
+			if(enc == INC_TRN_SLOW) uSP=uSP+0.03;
+			if(enc == INC_TRN_NORM) uSP=uSP+0.3;
+			if(enc == INC_TRN_FAST) uSP=uSP+3;
+			if(enc == DEC_TRN_SLOW) uSP=uSP-0.03;
+			if(enc == DEC_TRN_NORM) uSP=uSP-0.3;
+			if(enc == DEC_TRN_FAST) uSP=uSP-3;
+			if(uSP>30) uSP=30; // no more 30V
+			if(uSP<0) uSP=0; // no less 0V
+			ptr = float_to_char(uSP, float_for_LCD);
+			if(uSP<1)
+			{
+				LCD_DisplayString(5,71," 0",&Font16,BLACK,WHITE);
+				LCD_DisplayString(27,71,ptr,&Font16,BLACK,WHITE);
+			}
+			else
+			{
+				if(uSP<10)
+				{
+					LCD_DisplayString(5,71," ",&Font16,BLACK,WHITE);
+					LCD_DisplayString(16,71,ptr,&Font16,BLACK,WHITE);
+				}
+				else LCD_DisplayString(5,71,ptr,&Font16,BLACK,WHITE);
+			}
+			LCD_DisplayChar( 60,71,'0',&Font16,BLACK,WHITE );
+			LCD_DisplayChar( 71,71,'V',&Font16,BLACK,WHITE );
+			break;
+		}
+		case I:
+		{
+			if(enc == INC_TRN_SLOW) iSP=iSP+0.003;
+			if(enc == INC_TRN_NORM) iSP=iSP+0.03;
+			if(enc == INC_TRN_FAST) iSP=iSP+0.3;
+			if(enc == DEC_TRN_SLOW) iSP=iSP-0.003;
+			if(enc == DEC_TRN_NORM) iSP=iSP-0.03;
+			if(enc == DEC_TRN_FAST) iSP=iSP-0.3;
+			if(iSP>5) iSP=5; //no more 5A
+			if(iSP<0) iSP=0; // no less 0A
+			ptr = float_to_char(iSP, float_for_LCD);
+			if(iSP<1)
+			{
+				LCD_DisplayString(89,71,"0",&Font16,BLACK,WHITE);
+				LCD_DisplayString(100,71,ptr,&Font16,BLACK,WHITE);
+			}
+			else LCD_DisplayString(89,71,ptr,&Font16,BLACK,WHITE);
+			LCD_DisplayChar(144,71,'A',&Font16,BLACK,WHITE );
+			break;
+		}
+		}
 		enc=NO_TRN;
 	}
 
@@ -760,54 +925,54 @@ void menu_handler(void)
 			case ON_OFF: //Power on, off
 			{
 				LCD_DrawRectangle
-					(122, 3, 158, 22, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122, 3, 158, 22, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(122,22, 158, 41, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122,22, 158, 41, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = MODE;
 				break;
 			}
 			case MODE:  //Constant U or constant I
 			{
 				LCD_DrawRectangle
-					(122,22, 158, 41, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122,22, 158, 41, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(122,41, 158, 60, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122,41, 158, 60, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = MEM;
 				break;
 			}
 			case MEM: //Memory settings
 			{
 				LCD_DrawRectangle
-					(122,41, 158, 60, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122,41, 158, 60, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(122,60, 158, 71, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122,60, 158, 71, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = BL;
 				break;
 			}
 			case BL: //Back Light setup
 			{
 				LCD_DrawRectangle
-					(122,60, 158, 71, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122,60, 158, 71, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(3,73, 85, 87, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(3,71, 85, 88, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = U;
 				break;
 			}
 			case U: //Voltage set point
 			{
 				LCD_DrawRectangle
-					(3,73, 85, 87, BLACK, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(3,71, 85, 88, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(88,73, 158, 87, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(88,71, 158, 88, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = I;
 				break;
 			}
 			case I: //Current set point
 			{
 				LCD_DrawRectangle
-					(88,73, 158, 87, BLACK , DRAW_EMPTY, DOT_PIXEL_2X2);
+					(88,71, 158, 88, BLACK , DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(122, 3, 158, 22, WHITE, DRAW_EMPTY, DOT_PIXEL_2X2);
+					(122, 3, 158, 22, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = ON_OFF;
 				break;
 			}
