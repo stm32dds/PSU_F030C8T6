@@ -448,7 +448,7 @@ void HAL_TIM_Encoder_MspInit(TIM_HandleTypeDef* htim_encoder)
   /* USER CODE END TIM3_MspInit 1 */
   }
 
-}
+ }
 
 /**
 * @brief TIM_Base MSP Initialization

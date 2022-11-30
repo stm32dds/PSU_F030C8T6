@@ -165,9 +165,176 @@ void draw_main_st(COLOR backgr, COLOR front)
 	LCD_DisplayString(123,23," CV",&Font16,GBLUE,BLACK);
 	LCD_DisplayString(123,42," M0",&Font16,GRAY,BLACK);
 	LCD_DisplayString(123,61,"  LGT  ",&Font8,MAGENTA,WHITE);
-	LCD_DisplayString(5,71,"XX.XXXV",&Font16,backgr,front);
-	LCD_DisplayString(89,71,"Y.YYYA",&Font16,backgr,front);
-	LCD_DisplayString(18,90," onT:000d00h00m00s",&Font12,backgr,front);
-	LCD_DisplayString(18,102,"runT:000d00h00m00s",&Font12,backgr,front);
+	LCD_DisplayString(5,75," 5.000V",&Font16,backgr,front);
+	LCD_DisplayString(89,75,"1.000A",&Font16,backgr,front);
+	LCD_DisplayString(10,96,"   d  h  m  s",&Font16,backgr,front);
 	LCD_DisplayString(3,114,"MCU temperature",&Font12,backgr,front);
+	LCD_DisplayChar(144,114,'*',&Font12,BLUE,WHITE);
+	LCD_DisplayChar(151,114,'C',&Font12,BLUE,WHITE);
+}
+
+void get_time(RTC_HandleTypeDef hrtc, char* onTd100, char* onTd10, char* onTd1 ,
+		char* onTh10, char* onTh1, char* onTm10, char* onTm1, char* onTs10, char* onTs1,
+		bool on_off)
+{
+	RTC_TimeTypeDef sTime = {0};
+	RTC_DateTypeDef sDate = {0};
+	static uint8_t oldHours;
+	static uint16_t daysON;
+	uint32_t toChar; //temp. value to convert days into chars
+	if(!on_off)
+		HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD);
+	else
+	{
+		HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BCD);
+		HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BCD);
+		//Process RUN time
+		*onTs1 = (sTime.Seconds & 0x0F) +'0';
+		*onTs10 = (sTime.Seconds >> 4) + '0';
+		*onTm1 = (sTime.Minutes & 0x0F) +'0';
+		*onTm10 = (sTime.Minutes >> 4) + '0';
+		*onTh1 = (sTime.Hours & 0x0F) +'0';
+		*onTh10 = (sTime.Hours >> 4) + '0';
+		if(oldHours == 0x23)
+			if(sTime.Hours == 0) daysON++;
+		toChar = daysON;
+		*onTd1 = (toChar % 10) + '0';
+		toChar /= 10;
+		*onTd10 = (toChar % 10) + '0';
+		toChar /= 10;
+		*onTd100 = (toChar % 10) + '0';
+	}
+	oldHours = sTime.Hours;
+}
+
+void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float outI,
+					char onTd100, char onTd10, char onTd1, char onTh10, char onTh1,
+					char onTm10, char onTm1, char onTs10, char onTs1, float temp_MCU)
+{
+	static float old_outU, old_outI, old_outP;
+	float outP = outU*outI;
+	static char old_onTd100, old_onTd10, old_onTd1,
+				old_onTh10, old_onTh1, old_onTm10, old_onTm1, old_onTs10;
+	static bool old_on_off;
+	static char old_ptr_0, old_ptr_1;
+	if(on_off)
+	{
+		// Output Voltage
+		if (old_outU != outU)
+		{
+			ptr = float_to_char(outU, float_for_LCD);
+			if(outU<1)
+			{
+				LCD_DisplayString(1,1," 0",&Font24,BLACK,WHITE);
+				LCD_DisplayString(35,1,ptr,&Font24,BLACK,WHITE);
+			}
+			else
+			{
+				if(outU<10)
+				{
+					LCD_DisplayString(1,1," ",&Font24,BLACK,WHITE);
+					LCD_DisplayString(18,1,ptr,&Font24,BLACK,WHITE);
+				}
+				else LCD_DisplayString(1,1,ptr,&Font24,BLACK,WHITE);
+			}
+			LCD_DisplayChar(103, 1,'V',&Font24,BLACK,WHITE );
+		}
+
+		//Output current
+		if(old_outI != outI)
+		{
+			ptr = float_to_char(outI, float_for_LCD);
+			if(outI<1)
+			{
+				LCD_DisplayString(18,25,"0",&Font24,BLACK,WHITE);
+				LCD_DisplayString(35,25,ptr,&Font24,BLACK,WHITE);
+			}
+			else LCD_DisplayString(18,25,ptr,&Font24,BLACK,WHITE);
+			LCD_DisplayChar(103,25,'A',&Font24,BLACK,WHITE );
+		}
+
+		//Output Power
+		if(old_outP != outP)
+		{
+			ptr = float_to_char(outP, float_for_LCD);
+			if(outP < 1)
+			{
+				ptr[3] = 0; //wild truncating
+				LCD_DisplayString(1,49,"  0",&Font24,BLACK,WHITE);
+				LCD_DisplayString(52,49,ptr,&Font24,BLACK,WHITE);
+			}
+			else
+			{
+				if(outP < 10)
+				{
+					ptr[4] = 0; //wild truncating
+					LCD_DisplayString(1,49,"  ",&Font24,BLACK,WHITE);
+					LCD_DisplayString(35,49,ptr,&Font24,BLACK,WHITE);
+				}
+				else
+				{
+					if(outP < 100)
+					{
+						ptr[5] = 0; //wild truncating
+						LCD_DisplayString(1,49," ",&Font24,BLACK,WHITE);
+						LCD_DisplayString(18,49,ptr,&Font24,BLACK,WHITE);
+					}
+					else
+					{
+						ptr[5] = 0; //wild truncating
+						LCD_DisplayString(1,49,ptr,&Font24,BLACK,WHITE);
+					}
+				}
+			}
+			LCD_DisplayChar(103,49,'W',&Font24,BLACK,WHITE );
+		}
+	}
+	else //on_off=0/false
+	{
+		if(old_on_off != on_off)
+		{
+			LCD_DisplayString(1,1," 0.000V",&Font24,BLACK,YELLOW);
+			LCD_DisplayString(1,24," 0.000A",&Font24,BLACK,YELLOW);
+			LCD_DisplayString(1,46,"  0.00W",&Font24,BLACK,YELLOW);
+		}
+	}
+	// Time with powered output
+	if(old_onTd100 != onTd100)
+		LCD_DisplayChar(10,96,onTd100,&Font16,BLACK,WHITE );
+	if(old_onTd10 != onTd10)
+		LCD_DisplayChar(21,96,onTd10,&Font16,BLACK,WHITE );
+	if(old_onTd1 != onTd1)
+		LCD_DisplayChar(33,96,onTd1,&Font16,BLACK,WHITE );
+	if(old_onTh10 != onTh10)
+		LCD_DisplayChar(55,96,onTh10,&Font16,BLACK,WHITE );
+	if(old_onTh1 != onTh1)
+		LCD_DisplayChar(66,96,onTh1,&Font16,BLACK,WHITE );
+	if(old_onTm10 != onTm10)
+		LCD_DisplayChar(88,96,onTm10,&Font16,BLACK,WHITE );
+	if(old_onTm1 != onTm1)
+		LCD_DisplayChar(99,96,onTm1,&Font16,BLACK,WHITE );
+	if(old_onTs10 != onTs10)
+		LCD_DisplayChar(121,96,onTs10,&Font16,BLACK,WHITE );
+	LCD_DisplayChar(132,96,onTs1,&Font16,BLACK,WHITE );
+	//display MCU temperature
+	ptr = float_to_char(temp_MCU, float_for_LCD);
+	if(old_ptr_0 != ptr[0])
+		LCD_DisplayChar(130,114,ptr[0],&Font12,ORANGE,BLACK);
+	if(old_ptr_1 != ptr[1 ])
+		LCD_DisplayChar(137,114,ptr[1],&Font12,ORANGE,BLACK);
+	old_ptr_0 = ptr[0];
+	old_ptr_1 = ptr[1];
+	//Create logic to update only changed positions on LCD
+	old_outU = outU;
+	old_outI = outI;
+	old_outP = outP;
+	old_onTd100 = onTd100;
+	old_onTd10 = onTd10;
+	old_onTd1 = onTd1;
+	old_onTh10 = onTh10;
+	old_onTh1 = onTh1;
+	old_onTm10 = onTm10;
+	old_onTm1 = onTm1;
+	old_onTs10 = onTs10;
+	old_on_off = on_off;
 }

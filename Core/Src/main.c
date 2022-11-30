@@ -80,6 +80,9 @@ int8_t mem_sel = 0; // selected memory set from 0 to 9
 int16_t lcd_pwm_bl = 200; //max value
 float uSP = 5.0; // set point for output voltage
 float iSP = 1.0; // set point for output current
+char onTd100 = '0', onTd10 = '0', onTd1 = '0',
+	 onTh10 = '0', onTh1 = '0', onTm10 = '0', onTm1 = '0',
+	 onTs10 = '0', onTs1 = '0';// On time
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -165,8 +168,6 @@ int main(void)
 
   LCD_Init( lcd_ScanDir ); // LCD initialization
   draw_main_st(BLACK, WHITE); // Main static screen
-  HAL_Delay(10); //to get stable readings from ADCs
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -175,11 +176,11 @@ int main(void)
   {
 	  get_adcs(adc_RAW, &vdd, &temp_MCU, &outU, &outI, constU, constI);
 	  if((enc != NO_TRN)||(btn != NO_PRESS)) menu_handler();
-
-	  ptr = float_to_char(temp_MCU, float_for_LCD);
-	  ptr[4]=0; // easy way for fast truncate
- 	  LCD_DisplayString(116,114,ptr,&Font12,ORANGE,BLACK);
- 	  LCD_DisplayString((116+7*sizeof(ptr)),114,"*C",&Font12,ORANGE,BLACK);
+ 	  get_time(hrtc, &onTd100, &onTd10, &onTd1 , &onTh10, &onTh1, &onTm10, &onTm1,
+ 			  &onTs10, &onTs1, on_off);
+ 	  /* Place main control loop here */
+ 	  draw_main_dy(ptr, float_for_LCD, on_off, outU, outI, onTd100, onTd10, onTd1, onTh10,
+ 			  onTh1, onTm10, onTm1, onTs10, onTs1, temp_MCU);
 /*
  	  ptr = float_to_char(outU, float_for_LCD);
  	  if(outU >= 10) LCD_DisplayString(58,24,ptr,&Font24,BLACK,WHITE);
@@ -451,6 +452,9 @@ static void MX_RTC_Init(void)
 
   /* USER CODE END RTC_Init 0 */
 
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+
   /* USER CODE BEGIN RTC_Init 1 */
 
   /* USER CODE END RTC_Init 1 */
@@ -465,6 +469,31 @@ static void MX_RTC_Init(void)
   hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
   hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
   if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* USER CODE BEGIN Check_RTC_BKUP */
+
+  /* USER CODE END Check_RTC_BKUP */
+
+  /** Initialize RTC and set the Time and Date
+  */
+  sTime.Hours = 0x0;
+  sTime.Minutes = 0x0;
+  sTime.Seconds = 0x0;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.Month = RTC_MONTH_JANUARY;
+  sDate.Date = 0x1;
+  sDate.Year = 0x0;
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
   {
     Error_Handler();
   }
@@ -752,7 +781,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) //every 100mS
 {
-    if (htim->Instance==TIM6) //check if the interrupt comes from TIM3
+    if (htim->Instance==TIM6) //check if the interrupt comes from TIM6
         {
     		enc_cnt = TIM3->CNT; TIM3->CNT =0;
     		if (enc_cnt >0)
@@ -785,8 +814,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) //every 100mS
     				else btn = PRESS_LONG;
     			}
     		}
-
-
         }
 }
 
@@ -876,20 +903,20 @@ void menu_handler(void)
 			ptr = float_to_char(uSP, float_for_LCD);
 			if(uSP<1)
 			{
-				LCD_DisplayString(5,71," 0",&Font16,BLACK,WHITE);
-				LCD_DisplayString(27,71,ptr,&Font16,BLACK,WHITE);
+				LCD_DisplayString(5,75," 0",&Font16,BLACK,WHITE);
+				LCD_DisplayString(27,75,ptr,&Font16,BLACK,WHITE);
 			}
 			else
 			{
 				if(uSP<10)
 				{
-					LCD_DisplayString(5,71," ",&Font16,BLACK,WHITE);
-					LCD_DisplayString(16,71,ptr,&Font16,BLACK,WHITE);
+					LCD_DisplayString(5,75," ",&Font16,BLACK,WHITE);
+					LCD_DisplayString(16,75,ptr,&Font16,BLACK,WHITE);
 				}
-				else LCD_DisplayString(5,71,ptr,&Font16,BLACK,WHITE);
+				else LCD_DisplayString(5,75,ptr,&Font16,BLACK,WHITE);
 			}
-			LCD_DisplayChar( 60,71,'0',&Font16,BLACK,WHITE );
-			LCD_DisplayChar( 71,71,'V',&Font16,BLACK,WHITE );
+			LCD_DisplayChar( 60,75,'0',&Font16,BLACK,WHITE );
+			LCD_DisplayChar( 71,75,'V',&Font16,BLACK,WHITE );
 			break;
 		}
 		case I:
@@ -905,11 +932,11 @@ void menu_handler(void)
 			ptr = float_to_char(iSP, float_for_LCD);
 			if(iSP<1)
 			{
-				LCD_DisplayString(89,71,"0",&Font16,BLACK,WHITE);
-				LCD_DisplayString(100,71,ptr,&Font16,BLACK,WHITE);
+				LCD_DisplayString(89,75,"0",&Font16,BLACK,WHITE);
+				LCD_DisplayString(100,75,ptr,&Font16,BLACK,WHITE);
 			}
-			else LCD_DisplayString(89,71,ptr,&Font16,BLACK,WHITE);
-			LCD_DisplayChar(144,71,'A',&Font16,BLACK,WHITE );
+			else LCD_DisplayString(89,75,ptr,&Font16,BLACK,WHITE);
+			LCD_DisplayChar(144,75,'A',&Font16,BLACK,WHITE );
 			break;
 		}
 		}
@@ -954,23 +981,23 @@ void menu_handler(void)
 				LCD_DrawRectangle
 					(122,60, 158, 71, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(3,71, 85, 88, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+					(3,74, 85, 92, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = U;
 				break;
 			}
 			case U: //Voltage set point
 			{
 				LCD_DrawRectangle
-					(3,71, 85, 88, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
+					(3,74, 85, 92, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
-					(88,71, 158, 88, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+					(88,74, 158, 92, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = I;
 				break;
 			}
 			case I: //Current set point
 			{
 				LCD_DrawRectangle
-					(88,71, 158, 88, BLACK , DRAW_EMPTY, DOT_PIXEL_1X1);
+					(88,74, 158, 92, BLACK , DRAW_EMPTY, DOT_PIXEL_1X1);
 				LCD_DrawRectangle
 					(122, 3, 158, 22, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
 				mnu_sel = ON_OFF;
