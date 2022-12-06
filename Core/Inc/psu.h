@@ -9,7 +9,7 @@
 #define INC_PSU_H_
 
 #include "main.h"
-#include "LCD.h"
+#include "st7735.h"
 
 #define CHAR_BUFF_SIZE  10
 

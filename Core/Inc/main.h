@@ -121,6 +121,7 @@ void Error_Handler(void);
 #define I_DAC2_GPIO_Port GPIOB
 #define I_DAC6_Pin GPIO_PIN_9
 #define I_DAC6_GPIO_Port GPIOB
+
 /* USER CODE BEGIN Private defines */
 #define VREFINT_CAL_ADDR ((uint16_t*)(uint32_t) 0x1FFFF7BA)
 #define TEMP30_CAL_ADDR ((uint16_t*)(uint32_t) 0x1FFFF7B8)

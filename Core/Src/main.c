@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "DEV_Config.h"
+#include "st7735.h"
+//#include "fonts.h"
 #include "psu.h"
 /* USER CODE END Includes */
 
@@ -56,13 +57,13 @@ I2C_HandleTypeDef hi2c2;
 RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
+DMA_HandleTypeDef hdma_spi1_tx;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
-LCD_SCAN_DIR lcd_ScanDir = D2U_L2R; //LCD display direction
 volatile uint16_t adc_RAW[4]; //0-ADC-V,2-Temp.ADC, 3-Vref.ADC
 float vdd; //calculated by ADCs OnBoard Voltage
 float constU=1.0, constI=1.0; // calibration constants for U&I
@@ -166,7 +167,9 @@ int main(void)
   /* Start Back Light at max Level=200 */
   __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, lcd_pwm_bl);
 
-  LCD_Init( lcd_ScanDir ); // LCD initialization
+//  LCD_Init( lcd_ScanDir ); // LCD initialization
+  ST7735_Init();
+  ST7735_SetRotation(1);
   draw_main_st(BLACK, WHITE); // Main static screen
   /* USER CODE END 2 */
 
@@ -180,7 +183,7 @@ int main(void)
  			  &onTs10, &onTs1, on_off);
  	  /* Place main control loop here */
  	  draw_main_dy(ptr, float_for_LCD, on_off, outU, outI, onTd100, onTd10, onTd1, onTh10,
- 			  onTh1, onTm10, onTm1, onTs10, onTs1, temp_MCU);
+			  onTh1, onTm10, onTm1, onTs10, onTs1, temp_MCU);
 /*
  	  ptr = float_to_char(outU, float_for_LCD);
  	  if(outU >= 10) LCD_DisplayString(58,24,ptr,&Font24,BLACK,WHITE);
@@ -700,6 +703,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+  /* DMA1_Channel2_3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
 
 }
 
@@ -827,12 +833,12 @@ void menu_handler(void)
 		{
 			if(enc == INC_TRN_SLOW)
 			{
-				LCD_DisplayString(123,4," ON",&Font16,GREEN,WHITE);
+				ST7735_DrawString(124,2," ON",Font_11x18,WHITE,GREEN);
 				on_off = 1;
 			}
 			if(enc == DEC_TRN_SLOW)
 			{
-				LCD_DisplayString(123,4,"OFF",&Font16,RED,WHITE);
+				ST7735_DrawString(124,2,"OFF",Font_11x18,WHITE,RED);
 				on_off = 0;
 			}
 			break;
@@ -841,12 +847,12 @@ void menu_handler(void)
 		{
 			if(enc == INC_TRN_SLOW)
 			{
-				LCD_DisplayString(123,23," CV",&Font16,GBLUE,BLACK);
+				ST7735_DrawString(124,21," CV",Font_11x18,BLACK,GBLUE);
 				mod_sel_CI = false;
 			}
 			if(enc == DEC_TRN_SLOW)
 			{
-				LCD_DisplayString(123,23," CI",&Font16,BRRED,BLACK);
+				ST7735_DrawString(124,21," CI",Font_11x18,BLACK,BRRED);
 				mod_sel_CI = true ;
 			}
 			break;
@@ -868,8 +874,8 @@ void menu_handler(void)
 				}
 				float_for_LCD[0]=0x30+mem_sel;
 				float_for_LCD[1]=0;
-				LCD_DisplayString(123,42," M",&Font16,GRAY,BLACK);
-				LCD_DisplayString(145,42,float_for_LCD,&Font16,GRAY,BLACK);
+				ST7735_DrawString(124,40," M",Font_11x18,BLACK,GRAY);
+				ST7735_DrawString(146 ,40,float_for_LCD,Font_11x18,BLACK,GRAY);
 			}
 			break;
 		}
@@ -885,9 +891,9 @@ void menu_handler(void)
 			if (lcd_pwm_bl > 200) lcd_pwm_bl = 200;
 			__HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, lcd_pwm_bl);
 			if (lcd_pwm_bl != 200)
-				LCD_DisplayString(123,61,"  LGT  ",&Font8,MAGENTA,WHITE);
+				ST7735_DrawString(124,59,"LGT",Font_11x18,WHITE,MAGENTA);
 			else
-				LCD_DisplayString(123,61,"LGT-MAX",&Font8,MAGENTA,WHITE);
+				ST7735_DrawString(124,59,"MAX",Font_11x18,WHITE,MAGENTA);
 			break;
 		}
 		case U:
@@ -903,20 +909,20 @@ void menu_handler(void)
 			ptr = float_to_char(uSP, float_for_LCD);
 			if(uSP<1)
 			{
-				LCD_DisplayString(5,75," 0",&Font16,BLACK,WHITE);
-				LCD_DisplayString(27,75,ptr,&Font16,BLACK,WHITE);
+				ST7735_DrawString(5,84," 0",Font_11x18,WHITE,BLACK);
+				ST7735_DrawString(27,84,ptr,Font_11x18,WHITE,BLACK);
 			}
 			else
 			{
 				if(uSP<10)
 				{
-					LCD_DisplayString(5,75," ",&Font16,BLACK,WHITE);
-					LCD_DisplayString(16,75,ptr,&Font16,BLACK,WHITE);
+					ST7735_DrawString(5,84," ",Font_11x18,WHITE,BLACK);
+					ST7735_DrawString(16,84,ptr,Font_11x18,WHITE,BLACK);
 				}
-				else LCD_DisplayString(5,75,ptr,&Font16,BLACK,WHITE);
+				else ST7735_DrawString(5,84,ptr,Font_11x18,WHITE,BLACK);
 			}
-			LCD_DisplayChar( 60,75,'0',&Font16,BLACK,WHITE );
-			LCD_DisplayChar( 71,75,'V',&Font16,BLACK,WHITE );
+			ST7735_DrawString( 60,84,"0V",Font_11x18,WHITE,BLACK);
+//			ST7735_DrawString( 71,84,"V",Font_11x18,WHITE,BLACK);
 			break;
 		}
 		case I:
@@ -932,11 +938,11 @@ void menu_handler(void)
 			ptr = float_to_char(iSP, float_for_LCD);
 			if(iSP<1)
 			{
-				LCD_DisplayString(89,75,"0",&Font16,BLACK,WHITE);
-				LCD_DisplayString(100,75,ptr,&Font16,BLACK,WHITE);
+				ST7735_DrawString(89,84,"0",Font_11x18,WHITE,BLACK);
+				ST7735_DrawString(100,84,ptr,Font_11x18,WHITE,BLACK);
 			}
-			else LCD_DisplayString(89,75,ptr,&Font16,BLACK,WHITE);
-			LCD_DisplayChar(144,75,'A',&Font16,BLACK,WHITE );
+			else ST7735_DrawString(89,84,ptr,Font_11x18,WHITE,BLACK);
+			ST7735_DrawString(144,84,"A",Font_11x18,WHITE,BLACK);
 			break;
 		}
 		}
@@ -951,55 +957,55 @@ void menu_handler(void)
 			{
 			case ON_OFF: //Power on, off
 			{
-				LCD_DrawRectangle
-					(122, 3, 158, 22, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
-				LCD_DrawRectangle
-					(122,22, 158, 41, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+				ST7735_DrawRect
+					(123, 1, 35, 20, BLACK);
+				ST7735_DrawRect
+					(123,20, 35, 20, WHITE);
 				mnu_sel = MODE;
 				break;
 			}
 			case MODE:  //Constant U or constant I
 			{
-				LCD_DrawRectangle
-					(122,22, 158, 41, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
-				LCD_DrawRectangle
-					(122,41, 158, 60, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+				ST7735_DrawRect
+					(123,20, 35, 20, BLACK);
+				ST7735_DrawRect
+					(123,39, 35, 20, WHITE);
 				mnu_sel = MEM;
 				break;
 			}
 			case MEM: //Memory settings
 			{
-				LCD_DrawRectangle
-					(122,41, 158, 60, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
-				LCD_DrawRectangle
-					(122,60, 158, 71, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+				ST7735_DrawRect
+					(123,39, 35, 20, BLACK);
+				ST7735_DrawRect
+					(123,58, 35, 20, WHITE);
 				mnu_sel = BL;
 				break;
 			}
 			case BL: //Back Light setup
 			{
-				LCD_DrawRectangle
-					(122,60, 158, 71, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
-				LCD_DrawRectangle
-					(3,74, 85, 92, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+				ST7735_DrawRect
+					(123,58, 35, 20, BLACK);
+				ST7735_DrawRect
+					(4,83, 79, 20, WHITE);
 				mnu_sel = U;
 				break;
 			}
 			case U: //Voltage set point
 			{
-				LCD_DrawRectangle
-					(3,74, 85, 92, BLACK, DRAW_EMPTY, DOT_PIXEL_1X1);
-				LCD_DrawRectangle
-					(88,74, 158, 92, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+				ST7735_DrawRect
+					(4,83, 79, 20, BLACK);
+				ST7735_DrawRect
+					(87,83, 69, 20, WHITE);
 				mnu_sel = I;
 				break;
 			}
 			case I: //Current set point
 			{
-				LCD_DrawRectangle
-					(88,74, 158, 92, BLACK , DRAW_EMPTY, DOT_PIXEL_1X1);
-				LCD_DrawRectangle
-					(122, 3, 158, 22, WHITE, DRAW_EMPTY, DOT_PIXEL_1X1);
+				ST7735_DrawRect
+					(87,83, 69, 20, BLACK);
+				ST7735_DrawRect
+					(123, 1, 35, 20, WHITE);
 				mnu_sel = ON_OFF;
 				break;
 			}

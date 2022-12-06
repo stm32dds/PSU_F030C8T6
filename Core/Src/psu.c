@@ -156,22 +156,22 @@ char * float_to_char(float x, char *p)
 
 void draw_main_st(COLOR backgr, COLOR front)
 {
-	LCD_Clear(backgr);
-	LCD_DrawRectangle (1, 1, 160, 128, front, DRAW_EMPTY, DOT_PIXEL_1X1);
-	LCD_DisplayString(1,1,"00.000V",&Font24,backgr,YELLOW);
-	LCD_DisplayString(1,25," 0.000A",&Font24,backgr,YELLOW);
-	LCD_DisplayString(1,49,"000.00W",&Font24,backgr,YELLOW);
-	LCD_DisplayString(123,4,"OFF",&Font16,RED,WHITE);
-	LCD_DisplayString(123,23," CV",&Font16,GBLUE,BLACK);
-	LCD_DisplayString(123,42," M0",&Font16,GRAY,BLACK);
-	LCD_DisplayString(123,61,"  LGT  ",&Font8,MAGENTA,WHITE);
-	LCD_DisplayString(5,75," 5.000V",&Font16,backgr,front);
-	LCD_DisplayString(89,75,"1.000A",&Font16,backgr,front);
-	LCD_DisplayString(10,96,"   d  h  m  s",&Font16,backgr,front);
-	LCD_DisplayString(3,114,"MCU temperature",&Font12,backgr,front);
-	LCD_DisplayChar(144,114,'*',&Font12,BLUE,WHITE);
-	LCD_DisplayChar(151,114,'C',&Font12,BLUE,WHITE);
-}
+	ST7735_FillScreen(backgr);
+	ST7735_DrawRect(0, 0, 160, 128, front);
+	ST7735_DrawString(5,3,"00.000V",Font_16x26,YELLOW, backgr);
+	ST7735_DrawString(5,29," 0.000A",Font_16x26,YELLOW, backgr);
+	ST7735_DrawString(5,55,"000.00W",Font_16x26,YELLOW, backgr);
+	ST7735_DrawString(124,2,"OFF",Font_11x18,WHITE, RED);
+	ST7735_DrawString(124,21," CV",Font_11x18,BLACK,GBLUE);
+	ST7735_DrawString(124,40," M0",Font_11x18,BLACK,GRAY);
+	ST7735_DrawString(124,59,"LGT",Font_11x18,WHITE,MAGENTA);
+	ST7735_DrawString(5,84,"05.000V",Font_11x18,front,backgr);
+	ST7735_DrawString(89,84,"1.000A",Font_11x18,front, backgr);
+	ST7735_DrawString(3,106,"PonTime:000d00h00m00s",Font_7x10,front,backgr);
+	ST7735_DrawString(3,117,"MCU temperature",Font_7x10,front,backgr);
+	ST7735_DrawString(144,117,"*",Font_7x10,WHITE,BLUE);
+	ST7735_DrawString(151,117,"C",Font_7x10,WHITE,BLUE);
+ }
 
 void get_time(RTC_HandleTypeDef hrtc, char* onTd100, char* onTd10, char* onTd1 ,
 		char* onTh10, char* onTh1, char* onTm10, char* onTm1, char* onTs10, char* onTs1,
@@ -225,19 +225,19 @@ void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float
 			ptr = float_to_char(outU, float_for_LCD);
 			if(outU<1)
 			{
-				LCD_DisplayString(1,1," 0",&Font24,BLACK,WHITE);
-				LCD_DisplayString(35,1,ptr,&Font24,BLACK,WHITE);
+				ST7735_DrawString(5,3," 0",Font_16x26,WHITE,BLACK);
+				ST7735_DrawString(37,3,ptr,Font_16x26,WHITE,BLACK);
 			}
 			else
 			{
 				if(outU<10)
 				{
-					LCD_DisplayString(1,1," ",&Font24,BLACK,WHITE);
-					LCD_DisplayString(18,1,ptr,&Font24,BLACK,WHITE);
+					ST7735_DrawString(5,3," ",Font_16x26,WHITE,BLACK);
+					ST7735_DrawString(21,3,ptr,Font_16x26,WHITE,BLACK);
 				}
-				else LCD_DisplayString(1,1,ptr,&Font24,BLACK,WHITE);
+				else ST7735_DrawString(5,3,ptr,Font_16x26,WHITE,BLACK);
 			}
-			LCD_DisplayChar(103, 1,'V',&Font24,BLACK,WHITE );
+			ST7735_DrawString(101, 3,"V",Font_16x26,WHITE,BLACK);
 		}
 
 		//Output current
@@ -246,11 +246,11 @@ void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float
 			ptr = float_to_char(outI, float_for_LCD);
 			if(outI<1)
 			{
-				LCD_DisplayString(18,25,"0",&Font24,BLACK,WHITE);
-				LCD_DisplayString(35,25,ptr,&Font24,BLACK,WHITE);
+				ST7735_DrawString(21,29,"0",Font_16x26,WHITE,BLACK);
+				ST7735_DrawString(37,29,ptr,Font_16x26,WHITE,BLACK);
 			}
-			else LCD_DisplayString(18,25,ptr,&Font24,BLACK,WHITE);
-			LCD_DisplayChar(103,25,'A',&Font24,BLACK,WHITE );
+			else ST7735_DrawString(21,29,ptr,Font_16x26,WHITE,BLACK);
+			ST7735_DrawString(101,29,"A",Font_16x26,WHITE,BLACK);
 		}
 
 		//Output Power
@@ -260,68 +260,68 @@ void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float
 			if(outP < 1)
 			{
 				ptr[3] = 0; //wild truncating
-				LCD_DisplayString(1,49,"  0",&Font24,BLACK,WHITE);
-				LCD_DisplayString(52,49,ptr,&Font24,BLACK,WHITE);
+				ST7735_DrawString(5,55,"  0",Font_16x26,WHITE,BLACK);
+				ST7735_DrawString(53,55,ptr,Font_16x26,WHITE,BLACK);
 			}
 			else
 			{
 				if(outP < 10)
 				{
 					ptr[4] = 0; //wild truncating
-					LCD_DisplayString(1,49,"  ",&Font24,BLACK,WHITE);
-					LCD_DisplayString(35,49,ptr,&Font24,BLACK,WHITE);
+					ST7735_DrawString(5,55,"  ",Font_16x26,WHITE,BLACK);
+					ST7735_DrawString(37,55,ptr,Font_16x26,WHITE,BLACK);
 				}
 				else
 				{
 					if(outP < 100)
 					{
 						ptr[5] = 0; //wild truncating
-						LCD_DisplayString(1,49," ",&Font24,BLACK,WHITE);
-						LCD_DisplayString(18,49,ptr,&Font24,BLACK,WHITE);
+						ST7735_DrawString(5,55," ",Font_16x26,WHITE,BLACK);
+						ST7735_DrawString(21,55,ptr,Font_16x26,WHITE,BLACK);
 					}
 					else
 					{
 						ptr[5] = 0; //wild truncating
-						LCD_DisplayString(1,49,ptr,&Font24,BLACK,WHITE);
+						ST7735_DrawString(5,55,ptr,Font_16x26,WHITE,BLACK);
 					}
 				}
 			}
-			LCD_DisplayChar(103,49,'W',&Font24,BLACK,WHITE );
+			ST7735_DrawString(101,55,"W",Font_16x26,WHITE,BLACK);
 		}
 	}
 	else //on_off=0/false
 	{
 		if(old_on_off != on_off)
 		{
-			LCD_DisplayString(1,1," 0.000V",&Font24,BLACK,YELLOW);
-			LCD_DisplayString(1,24," 0.000A",&Font24,BLACK,YELLOW);
-			LCD_DisplayString(1,46,"  0.00W",&Font24,BLACK,YELLOW);
+			ST7735_DrawString(5,3," 0.000V",Font_16x26,YELLOW,BLACK);
+			ST7735_DrawString(5,29," 0.000A",Font_16x26,YELLOW,BLACK);
+			ST7735_DrawString(5,55,"  0.00W",Font_16x26,YELLOW,BLACK);
 		}
 	}
 	// Time with powered output
 	if(old_onTd100 != onTd100)
-		LCD_DisplayChar(10,96,onTd100,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(59,106,onTd100,Font_7x10,WHITE,BLACK);
 	if(old_onTd10 != onTd10)
-		LCD_DisplayChar(21,96,onTd10,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(66,106,onTd10,Font_7x10,WHITE,BLACK);
 	if(old_onTd1 != onTd1)
-		LCD_DisplayChar(33,96,onTd1,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(73,106,onTd1,Font_7x10,WHITE,BLACK);
 	if(old_onTh10 != onTh10)
-		LCD_DisplayChar(55,96,onTh10,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(87,106,onTh10,Font_7x10,WHITE,BLACK);
 	if(old_onTh1 != onTh1)
-		LCD_DisplayChar(66,96,onTh1,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(94,106,onTh1,Font_7x10,WHITE,BLACK);
 	if(old_onTm10 != onTm10)
-		LCD_DisplayChar(88,96,onTm10,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(108,106,onTm10,Font_7x10,WHITE,BLACK);
 	if(old_onTm1 != onTm1)
-		LCD_DisplayChar(99,96,onTm1,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(115,106,onTm1,Font_7x10,WHITE,BLACK);
 	if(old_onTs10 != onTs10)
-		LCD_DisplayChar(121,96,onTs10,&Font16,BLACK,WHITE );
-	LCD_DisplayChar(132,96,onTs1,&Font16,BLACK,WHITE );
+		ST7735_DrawChar(129,106,onTs10,Font_7x10,WHITE,BLACK);
+	ST7735_DrawChar(136,106,onTs1,Font_7x10,WHITE,BLACK);
 	//display MCU temperature
 	ptr = float_to_char(temp_MCU, float_for_LCD);
 	if(old_ptr_0 != ptr[0])
-		LCD_DisplayChar(130,114,ptr[0],&Font12,ORANGE,BLACK);
+		ST7735_DrawChar(130,117,ptr[0],Font_7x10,WHITE,ORANGE);
 	if(old_ptr_1 != ptr[1 ])
-		LCD_DisplayChar(137,114,ptr[1],&Font12,ORANGE,BLACK);
+		ST7735_DrawChar(137,117,ptr[1],Font_7x10,WHITE,ORANGE);
 	old_ptr_0 = ptr[0];
 	old_ptr_1 = ptr[1];
 	//Create logic to update only changed positions on LCD
