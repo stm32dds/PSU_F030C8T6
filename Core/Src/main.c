@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+ /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -64,8 +64,8 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
-volatile uint16_t adc_RAW[4]; //0-ADC-V,2-Temp.ADC, 3-Vref.ADC
-float vdd; //calculated by ADCs OnBoard Voltage
+volatile uint16_t adc_RAW[4]; //0-ADC-V,1-ADC-I,2-Temp.ADC, 3-Vref.ADC
+float vdd;//calculated by ADCs OnBoard Voltage
 float constU=1.0, constI=1.0; // calibration constants for U&I
 float outU, outI, temp_MCU;
 char float_for_LCD[CHAR_BUFF_SIZE];
@@ -84,6 +84,7 @@ float iSP = 1.0; // set point for output current
 char onTd100 = '0', onTd10 = '0', onTd1 = '0',
 	 onTh10 = '0', onTh1 = '0', onTm10 = '0', onTm1 = '0',
 	 onTs10 = '0', onTs1 = '0';// On time
+uint16_t uint_spU=0, uint_spI=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,7 +121,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+   HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -181,40 +182,38 @@ int main(void)
 	  if((enc != NO_TRN)||(btn != NO_PRESS)) menu_handler();
  	  get_time(hrtc, &onTd100, &onTd10, &onTd1 , &onTh10, &onTh1, &onTm10, &onTm1,
  			  &onTs10, &onTs1, on_off);
- 	  /* Place main control loop here */
  	  draw_main_dy(ptr, float_for_LCD, on_off, outU, outI, onTd100, onTd10, onTd1, onTh10,
 			  onTh1, onTm10, onTm1, onTs10, onTs1, temp_MCU);
-/*
- 	  ptr = float_to_char(outU, float_for_LCD);
- 	  if(outU >= 10) LCD_DisplayString(58,24,ptr,&Font24,BLACK,WHITE);
- 	  if((outU < 10)&&(outU >=1))
- 	  {
-  		 LCD_DisplayChar(58,24,' ',&Font24,BLACK,WHITE);
- 		 LCD_DisplayString(75,24,ptr,&Font24,BLACK,WHITE);
- 	  }
- 	  if(outU < 1)
- 	  {
-   		 LCD_DisplayChar(75,24,'0',&Font24,BLACK,WHITE);
- 		 LCD_DisplayString(92,24,ptr,&Font24,BLACK,WHITE);
- 	  }
-	  v_DAC10_Set(0x1ff);
-	  i_DAC10_Set(0x1ff);
-	  v_DAC10_Set(0x3f0);
-	  i_DAC10_Set(0x3f0);
-	  v_DAC10_Set(0x3ff);
-	  i_DAC10_Set(0x3ff);
-
-	  if (btn==PRESS_NORM)
+ 	  if(temp_MCU < 85.0) //no over hating
 	  {
-		  btn=NO_PRESS;
+ 		  if(!mod_sel_CI) // constant voltage mode
+ 		  {
+ 			  if(on_off) // output is POWERED
+ 			  {
+ 				  uint_spU = (uint16_t)(34.1 * uSP);
+ 				  v_DAC10_Set(uint_spU);
+ 				  uint_spI = (uint16_t)(204.6 * iSP);
+ 				  i_DAC10_Set(uint_spI);
+ 			  }
+ 			  else // output is UNPOWERED
+ 			  {
+ 				  v_DAC10_Set(0);
+ 				  i_DAC10_Set(0);
+ 			  }
+ 		  }
+ 		  else //constant current mode -NOT IMPLEMENTED YET!!!!
+ 		  {
+ 			  // just to go to CV if Wrong Selected by UI
+ 			  //subject of future implementation
+ 			 mod_sel_CI= false;
+ 		  }
 	  }
-	  if (btn==PRESS_LONG)
-	  {
-		  btn=NO_PRESS;
-	  }
-*/
-	  v_DAC10_Set(0);
-	  i_DAC10_Set(0);
+ 	  else //over heating, output UNPOWERED
+ 	  {
+ 		  v_DAC10_Set(0);
+ 		  i_DAC10_Set(0);
+ 		  on_off = false;
+ 	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -312,7 +311,7 @@ static void MX_ADC_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = ADC_RANK_CHANNEL_NUMBER;
-  sConfig.SamplingTime = ADC_SAMPLETIME_71CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_239CYCLES_5;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -927,12 +926,12 @@ void menu_handler(void)
 		}
 		case I:
 		{
-			if(enc == INC_TRN_SLOW) iSP=iSP+0.003;
-			if(enc == INC_TRN_NORM) iSP=iSP+0.03;
-			if(enc == INC_TRN_FAST) iSP=iSP+0.3;
-			if(enc == DEC_TRN_SLOW) iSP=iSP-0.003;
-			if(enc == DEC_TRN_NORM) iSP=iSP-0.03;
-			if(enc == DEC_TRN_FAST) iSP=iSP-0.3;
+			if(enc == INC_TRN_SLOW) iSP=iSP+0.005;
+			if(enc == INC_TRN_NORM) iSP=iSP+0.05;
+			if(enc == INC_TRN_FAST) iSP=iSP+0.5;
+			if(enc == DEC_TRN_SLOW) iSP=iSP-0.005;
+			if(enc == DEC_TRN_NORM) iSP=iSP-0.05;
+			if(enc == DEC_TRN_FAST) iSP=iSP-0.5;
 			if(iSP>5) iSP=5; //no more 5A
 			if(iSP<0) iSP=0; // no less 0A
 			ptr = float_to_char(iSP, float_for_LCD);
@@ -1013,7 +1012,23 @@ void menu_handler(void)
 		}
 		if(btn == PRESS_LONG)
 		{
-			;
+			if(mnu_sel != MEM)
+			{
+				if(on_off)
+				{
+					ST7735_DrawString(124,2,"OFF",Font_11x18,WHITE,RED);
+					on_off = false;
+				}
+				else
+				{
+					ST7735_DrawString(124,2," ON",Font_11x18,WHITE,GREEN);
+					on_off = true;
+				}
+			}
+			else
+			{
+				; // process memmory presseting selection
+			}
 		}
 		btn=NO_PRESS;
 	}
