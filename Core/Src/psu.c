@@ -1,7 +1,7 @@
 /*
  ******************************************************************************
  * @file           : psu.c
- * @brief          : Basic functions to realize  linear power supply
+ * @brief          : Basic functions to realize linear power supply
  ******************************************************************************
  *  Created on: Nov 2, 2022
  *      Author: Ivan
