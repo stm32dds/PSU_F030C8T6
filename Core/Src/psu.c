@@ -114,16 +114,69 @@ void v_DAC10_Set(uint16_t vDACout)
 	else HAL_GPIO_WritePin(V_DAC0_GPIO_Port, V_DAC0_Pin, GPIO_PIN_RESET);
 }
 
-void get_adcs(volatile uint16_t adc_RAW[], float *vdd, float *temp_MCU,
-		float *outU,float *outI, float constU, float constI)
+void get_adcs(volatile uint16_t adc_RAW[], float *temp_MCU,
+		float *outU,float *outI, float constU, float constI, float vdd)
 {
-	  *vdd = 3.3 * (*VREFINT_CAL_ADDR) / adc_RAW[3];
-	  *temp_MCU = (((int32_t)adc_RAW[2] * (*vdd)/3.3)- (int32_t) *TEMP30_CAL_ADDR );
+	  //calculate internal MCU temperature
+	  *temp_MCU = (((int32_t)adc_RAW[2] * vdd/3.3)- (int32_t) *TEMP30_CAL_ADDR );
 	  *temp_MCU = *temp_MCU * (int32_t)(110 - 30);
 	  *temp_MCU = *temp_MCU / (int32_t)(*TEMP110_CAL_ADDR - *TEMP30_CAL_ADDR);
 	  *temp_MCU = *temp_MCU + 30;
-	  *outI = constI*(*vdd)*adc_RAW[1]/4095;
-	  *outU = constU*(*vdd)*adc_RAW[0]/4095;
+	  // store RAW ADC data to calculate averaged values for U and I
+	  #define FILTER_DEPTH 9  //max.16 else OVERFLOW, if average method used
+	  static uint8_t  filt_cnt;
+	  static uint16_t adc_RAW_U[FILTER_DEPTH];
+	  static uint16_t adc_RAW_I[FILTER_DEPTH];
+
+	  adc_RAW_U[filt_cnt] = adc_RAW[0];
+	  adc_RAW_I[filt_cnt] = adc_RAW[1];
+	  filt_cnt++;
+	  if(filt_cnt > (FILTER_DEPTH-1)) filt_cnt = 0;
+	  //calculate averaged values
+	  /*
+	  uint16_t  avg_U=0, avg_I=0;
+	  for(uint8_t  avg_cnt =0; avg_cnt < FILTER_DEPTH; avg_cnt++)
+	  {
+		  avg_U = avg_U + adc_RAW_U[avg_cnt];
+		  avg_I = avg_I + adc_RAW_I[avg_cnt];
+	  }
+	  avg_U = avg_U/FILTER_DEPTH;
+	  avg_I = avg_I/FILTER_DEPTH;
+	  //calculate U&I on output (averaged)
+	  *outI = constI*avg_I;
+	  *outU = constU*avg_U;
+	  */
+
+	    uint16_t maxCountU = 0;  // Maximum number of encounters -U
+	    uint16_t maxCountI = 0;  // Maximum number of encounters -I
+	    uint16_t mostFrequentU = adc_RAW_U[0];  // Most common number - U
+	    uint16_t mostFrequentI = adc_RAW_I[0];  // Most common number - I
+
+	    for (uint8_t i = 0; i < FILTER_DEPTH; i++) {
+	        uint8_t currentCountU = 1;  // We reset the counter for the current number-U
+	        uint8_t currentCountI = 1;  // We reset the counter for the current number-I
+
+	        // We loop through the remaining elements of the array and count
+	        //the occurrences of the current number
+	        for (uint8_t j = i + 1; j < FILTER_DEPTH; j++) {
+	            if (adc_RAW_U[i] == adc_RAW_U[j]) currentCountU++;
+	            if (adc_RAW_I[i] == adc_RAW_I[j]) currentCountI++;
+	        }
+
+	        //We check if the current number has more occurrences than the maximum for U
+	        if (currentCountU > maxCountU) {
+	            maxCountU = currentCountU;
+	            mostFrequentU = adc_RAW_U[i];
+	        }
+	        //We check if the current number has more occurrences than the maximum for I
+	        if (currentCountI > maxCountI) {
+	            maxCountI = currentCountI;
+	            mostFrequentI = adc_RAW_I[i];
+	        }
+	    }
+		  *outI = constI*mostFrequentI;
+		  //*outU = constU*mostFrequentU-(0.18*(*outI));
+		  *outU = constU*mostFrequentU;
 }
 
 char * float_to_char(float x, char *p)

@@ -1,4 +1,4 @@
- /* USER CODE BEGIN  Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -64,9 +64,10 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
-volatile uint16_t adc_RAW[4]; //0-ADC-V,1-ADC-I,2-Temp.ADC, 3-Vref.ADC
-float vdd;//calculated by ADCs OnBoard Voltage
-float constU=1.0, constI=1.0; // calibration constants for U&I
+volatile uint16_t adc_RAW[3]; //0-ADC-V,1-ADC-I,2-Temp.ADC
+float vdd = 3.302; //On board regulated voltage
+float scaleU=9.28 , scaleI=1.835; // scaling constants for U,I~9,1/1,48
+float constU, constI; // pre-calculated constant to speed up U&I calculation
 float outU, outI, temp_MCU;
 char float_for_LCD[CHAR_BUFF_SIZE];
 enum EncStates enc = NO_TRN;
@@ -121,7 +122,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-   HAL_Init();
+    HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -151,7 +152,7 @@ int main(void)
 	  	  	  	  	  	  	  	  	  	  	  	  	  Error_Handler();
 
   /* Start ADC group regular conversion by DMA*/
-  if (HAL_ADC_Start_DMA(&hadc,(uint32_t *)adc_RAW,4) != HAL_OK)
+  if (HAL_ADC_Start_DMA(&hadc,(uint32_t *)adc_RAW,3) != HAL_OK)
 	  	  	  	  	  	  	  	  	  	  	  	  	  Error_Handler();
 
   /* Start TIM3 as encoder counter */
@@ -171,14 +172,17 @@ int main(void)
 //  LCD_Init( lcd_ScanDir ); // LCD initialization
   ST7735_Init();
   ST7735_SetRotation(1);
+  //implement here setup screen
   draw_main_st(BLACK, WHITE); // Main static screen
+  constU = (vdd*scaleU)/4095; //calculated only once to avoid...
+  constI = (vdd*scaleI)/4095; //....circular repeated calculation
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  get_adcs(adc_RAW, &vdd, &temp_MCU, &outU, &outI, constU, constI);
+	  get_adcs(adc_RAW, &temp_MCU, &outU, &outI, constU, constI, vdd);
 	  if((enc != NO_TRN)||(btn != NO_PRESS)) menu_handler();
  	  get_time(hrtc, &onTd100, &onTd10, &onTd1 , &onTh10, &onTh1, &onTm10, &onTm1,
  			  &onTs10, &onTs1, on_off);
@@ -190,7 +194,7 @@ int main(void)
  		  {
  			  if(on_off) // output is POWERED
  			  {
- 				  uint_spU = (uint16_t)(34.1 * uSP);
+ 				  uint_spU = (uint16_t)(33.40 * uSP);
  				  v_DAC10_Set(uint_spU);
  				  uint_spI = (uint16_t)(204.6 * iSP);
  				  i_DAC10_Set(uint_spI);
@@ -328,14 +332,6 @@ static void MX_ADC_Init(void)
   /** Configure for the selected ADC regular channel to be converted.
   */
   sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
-  if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel to be converted.
-  */
-  sConfig.Channel = ADC_CHANNEL_VREFINT;
   if (HAL_ADC_ConfigChannel(&hadc, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -716,6 +712,8 @@ static void MX_DMA_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -781,6 +779,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
