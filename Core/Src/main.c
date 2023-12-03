@@ -36,8 +36,8 @@ enum MenuSelected {ON_OFF,MODE, MEM, BL, U, I};
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TRN_SLOW_NORM  4
-#define TRN_NORM_FAST  10 //16
+#define TRN_SLOW_NORM  4   //4
+#define TRN_NORM_FAST  10 //10
 #define NORM_PRESS_TIME  1 // *100 in mS
 #define LONG_PRESS_TIME  5 // *100 in mS
 /* USER CODE END PD */
@@ -66,12 +66,12 @@ TIM_HandleTypeDef htim6;
 /* USER CODE BEGIN PV */
 volatile uint16_t adc_RAW[3]; //0-ADC-V,1-ADC-I,2-Temp.ADC
 float vdd = 3.302; //On board regulated voltage
-float scaleU=9.28 , scaleI=1.835; // scaling constants for U,I~9,1/1,48
+float scaleU=9.46 , scaleI=1.43; // scaling constants for U,I~9,1/1,48
 float constU, constI; // pre-calculated constant to speed up U&I calculation
 float outU, outI, temp_MCU;
 char float_for_LCD[CHAR_BUFF_SIZE];
 enum EncStates enc = NO_TRN;
-enum BtnStates btn = PRESS_NORM;// to activate V menu on start
+enum BtnStates btn = NO_PRESS;
 enum MenuSelected mnu_sel = BL;
 int16_t enc_cnt = 0;
 uint8_t btn_cnt = 0;
@@ -102,6 +102,7 @@ static void MX_TIM6_Init(void);
 static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 void menu_handler(void);
+void device_settings(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -122,7 +123,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-    HAL_Init();
+   HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -172,7 +173,8 @@ int main(void)
 //  LCD_Init( lcd_ScanDir ); // LCD initialization
   ST7735_Init();
   ST7735_SetRotation(1);
-  //implement here setup screen
+  if(btn != NO_PRESS) device_settings();//setup screen
+  btn = PRESS_NORM;// to activate V menu on start
   draw_main_st(BLACK, WHITE); // Main static screen
   constU = (vdd*scaleU)/4095; //calculated only once to avoid...
   constI = (vdd*scaleI)/4095; //....circular repeated calculation
@@ -192,17 +194,18 @@ int main(void)
 	  {
  		  if(!mod_sel_CI) // constant voltage mode
  		  {
+ 			  uint_spI = (uint16_t)(218   * iSP);
+ 			  i_DAC10_Set(uint_spI);
  			  if(on_off) // output is POWERED
  			  {
  				  uint_spU = (uint16_t)(33.40 * uSP);
  				  v_DAC10_Set(uint_spU);
- 				  uint_spI = (uint16_t)(204.6 * iSP);
- 				  i_DAC10_Set(uint_spI);
+
  			  }
  			  else // output is UNPOWERED
  			  {
  				  v_DAC10_Set(0);
- 				  i_DAC10_Set(0);
+ 				  //  i_DAC10_Set(0);
  			  }
  		  }
  		  else //constant current mode -NOT IMPLEMENTED YET!!!!
@@ -788,7 +791,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) //every 100mS
 {
     if (htim->Instance==TIM6) //check if the interrupt comes from TIM6
         {
-    		enc_cnt = TIM3->CNT; TIM3->CNT =0;
+    		enc_cnt = TIM3->CNT; TIM3->CNT = 0;
     		if (enc_cnt >0)
     		{
     			if(enc_cnt <= TRN_SLOW_NORM) enc = INC_TRN_SLOW;
@@ -897,10 +900,10 @@ void menu_handler(void)
 		}
 		case U:
 		{
-			if(enc == INC_TRN_SLOW) uSP=uSP+0.03;
+			if(enc == INC_TRN_SLOW) uSP=uSP+0.01; //0.03
 			if(enc == INC_TRN_NORM) uSP=uSP+0.3;
 			if(enc == INC_TRN_FAST) uSP=uSP+3;
-			if(enc == DEC_TRN_SLOW) uSP=uSP-0.03;
+			if(enc == DEC_TRN_SLOW) uSP=uSP-0.01; //0.03
 			if(enc == DEC_TRN_NORM) uSP=uSP-0.3;
 			if(enc == DEC_TRN_FAST) uSP=uSP-3;
 			if(uSP>30) uSP=30; // no more 30V
@@ -926,13 +929,13 @@ void menu_handler(void)
 		}
 		case I:
 		{
-			if(enc == INC_TRN_SLOW) iSP=iSP+0.005;
+			if(enc == INC_TRN_SLOW) iSP=iSP+0.001; //0.005
 			if(enc == INC_TRN_NORM) iSP=iSP+0.05;
 			if(enc == INC_TRN_FAST) iSP=iSP+0.5;
-			if(enc == DEC_TRN_SLOW) iSP=iSP-0.005;
+			if(enc == DEC_TRN_SLOW) iSP=iSP-0.001; //0.005
 			if(enc == DEC_TRN_NORM) iSP=iSP-0.05;
 			if(enc == DEC_TRN_FAST) iSP=iSP-0.5;
-			if(iSP>5) iSP=5; //no more 5A
+			if(iSP>4.6) iSP=4.6; //no more 4.6A
 			if(iSP<0) iSP=0; // no less 0A
 			ptr = float_to_char(iSP, float_for_LCD);
 			if(iSP<1)
@@ -1032,6 +1035,14 @@ void menu_handler(void)
 		}
 		btn=NO_PRESS;
 	}
+}
+
+void device_settings(void)
+{
+	ST7735_FillScreen(GRAY);
+	ST7735_DrawString(3,0,"Device Setting",Font_11x18,WHITE, RED);
+	while(!HAL_GPIO_ReadPin(SW_T_GPIO_Port,SW_T_Pin)); // Button is released
+	btn=NO_PRESS;
 }
 /* USER CODE END 4 */
 

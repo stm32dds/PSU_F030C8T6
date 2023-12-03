@@ -123,7 +123,7 @@ void get_adcs(volatile uint16_t adc_RAW[], float *temp_MCU,
 	  *temp_MCU = *temp_MCU / (int32_t)(*TEMP110_CAL_ADDR - *TEMP30_CAL_ADDR);
 	  *temp_MCU = *temp_MCU + 30;
 	  // store RAW ADC data to calculate averaged values for U and I
-	  #define FILTER_DEPTH 9  //max.16 else OVERFLOW, if average method used
+	  #define FILTER_DEPTH 45  //max.16 else OVERFLOW, if average method used
 	  static uint8_t  filt_cnt;
 	  static uint16_t adc_RAW_U[FILTER_DEPTH];
 	  static uint16_t adc_RAW_I[FILTER_DEPTH];
@@ -147,6 +147,7 @@ void get_adcs(volatile uint16_t adc_RAW[], float *temp_MCU,
 	  *outU = constU*avg_U;
 	  */
 
+	  // Method to find most common values
 	    uint16_t maxCountU = 0;  // Maximum number of encounters -U
 	    uint16_t maxCountI = 0;  // Maximum number of encounters -I
 	    uint16_t mostFrequentU = adc_RAW_U[0];  // Most common number - U
@@ -175,8 +176,8 @@ void get_adcs(volatile uint16_t adc_RAW[], float *temp_MCU,
 	        }
 	    }
 		  *outI = constI*mostFrequentI;
-		  //*outU = constU*mostFrequentU-(0.18*(*outI));
-		  *outU = constU*mostFrequentU;
+		  *outU = constU*mostFrequentU-(0.18*(*outI));
+		  //*outU = constU*mostFrequentU;
 }
 
 char * float_to_char(float x, char *p)
