@@ -216,7 +216,7 @@ void draw_main_st(COLOR backgr, COLOR front)
 	ST7735_DrawString(5,29," 0.000A",Font_16x26,YELLOW, backgr);
 	ST7735_DrawString(5,55,"000.00W",Font_16x26,YELLOW, backgr);
 	ST7735_DrawString(124,2,"OFF",Font_11x18,WHITE, RED);
-	ST7735_DrawString(124,21," CV",Font_11x18,BLACK,GBLUE);
+	ST7735_DrawString(124,21," SL",Font_11x18,BLACK,GBLUE);
 	ST7735_DrawString(124,40," M0",Font_11x18,BLACK,GRAY);
 	ST7735_DrawString(124,59,"LGT",Font_11x18,WHITE,MAGENTA);
 	ST7735_DrawString(5,84,"05.000V",Font_11x18,front,backgr);
@@ -391,4 +391,9 @@ void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float
 	old_onTm1 = onTm1;
 	old_onTs10 = onTs10;
 	old_on_off = on_off;
+}
+
+void save_settings(void)
+{
+	HAL_Delay(1);
 }

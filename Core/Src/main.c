@@ -32,6 +32,7 @@ enum EncStates {NO_TRN, INC_TRN_SLOW, INC_TRN_NORM,INC_TRN_FAST,
 						DEC_TRN_SLOW, DEC_TRN_NORM,DEC_TRN_FAST};
 enum BtnStates {NO_PRESS, FIRST_EDGE, PRESS_NORM, PRESS_LONG};
 enum MenuSelected {ON_OFF,MODE, MEM, BL, U, I};
+enum dsMenuSelected {U_DISP,I_DISP, U_SETP, I_SETP, EXIT, SAVE_EXIT};
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -40,6 +41,14 @@ enum MenuSelected {ON_OFF,MODE, MEM, BL, U, I};
 #define TRN_NORM_FAST  10 //10
 #define NORM_PRESS_TIME  1 // *100 in mS
 #define LONG_PRESS_TIME  5 // *100 in mS
+#define SCALE_U_MIN 8.0
+#define SCALE_U_MAX 11.0
+#define SCALE_I_MIN 0.5
+#define SCALE_I_MAX 2.0
+#define SCALE_U_SP_MIN 27.0
+#define SCALE_U_SP_MAX 38.0
+#define SCALE_I_SP_MIN 205.0
+#define SCALE_I_SP_MAX 230.0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,17 +76,20 @@ TIM_HandleTypeDef htim6;
 volatile uint16_t adc_RAW[3]; //0-ADC-V,1-ADC-I,2-Temp.ADC
 float vdd = 3.302; //On board regulated voltage
 float scaleU=9.46 , scaleI=1.43; // scaling constants for U,I~9,1/1,48
+float scaleUsp=33.40, scaleIsp=218.00; //scaling const. for set points
 float constU, constI; // pre-calculated constant to speed up U&I calculation
 float outU, outI, temp_MCU;
-char float_for_LCD[CHAR_BUFF_SIZE];
+char float_for_LCD[CHAR_BUFF_SIZE+1];
 enum EncStates enc = NO_TRN;
 enum BtnStates btn = NO_PRESS;
 enum MenuSelected mnu_sel = BL;
+enum dsMenuSelected ds_mnu_sel = U_DISP;
+
 int16_t enc_cnt = 0;
 uint8_t btn_cnt = 0;
 char* ptr; // Point to converted to char floats for LCD displaying
 bool on_off = false; // disable/enable power at output 0/1
-bool mod_sel_CI = false; // constant voltage/constant current 0/1
+bool mod_sel_MS = false; // device is slave/device is master 0/1
 int8_t mem_sel = 0; // selected memory set from 0 to 9
 int16_t lcd_pwm_bl = 200; //max value
 float uSP = 5.0; // set point for output voltage
@@ -123,7 +135,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-   HAL_Init();
+     HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -173,7 +185,7 @@ int main(void)
 //  LCD_Init( lcd_ScanDir ); // LCD initialization
   ST7735_Init();
   ST7735_SetRotation(1);
-  if(btn != NO_PRESS) device_settings();//setup screen
+  if(!HAL_GPIO_ReadPin(SW_T_GPIO_Port,SW_T_Pin)) device_settings();//setup screen
   btn = PRESS_NORM;// to activate V menu on start
   draw_main_st(BLACK, WHITE); // Main static screen
   constU = (vdd*scaleU)/4095; //calculated only once to avoid...
@@ -192,13 +204,13 @@ int main(void)
 			  onTh1, onTm10, onTm1, onTs10, onTs1, temp_MCU);
  	  if(temp_MCU < 85.0) //no over hating
 	  {
- 		  if(!mod_sel_CI) // constant voltage mode
+ 		  if(!mod_sel_MS) // device is in slave mode
  		  {
- 			  uint_spI = (uint16_t)(218   * iSP);
+ 			  uint_spI = (uint16_t)(scaleIsp   * iSP);
  			  i_DAC10_Set(uint_spI);
  			  if(on_off) // output is POWERED
  			  {
- 				  uint_spU = (uint16_t)(33.40 * uSP);
+ 				  uint_spU = (uint16_t)(scaleUsp * uSP);
  				  v_DAC10_Set(uint_spU);
 
  			  }
@@ -212,7 +224,7 @@ int main(void)
  		  {
  			  // just to go to CV if Wrong Selected by UI
  			  //subject of future implementation
- 			 mod_sel_CI= false;
+ 			 mod_sel_MS= false;
  		  }
 	  }
  	  else //over heating, output UNPOWERED
@@ -849,13 +861,13 @@ void menu_handler(void)
 		{
 			if(enc == INC_TRN_SLOW)
 			{
-				ST7735_DrawString(124,21," CV",Font_11x18,BLACK,GBLUE);
-				mod_sel_CI = false;
+				ST7735_DrawString(124,21," SL",Font_11x18,BLACK,GBLUE);
+				mod_sel_MS = false;
 			}
 			if(enc == DEC_TRN_SLOW)
 			{
-				ST7735_DrawString(124,21," CI",Font_11x18,BLACK,BRRED);
-				mod_sel_CI = true ;
+				ST7735_DrawString(124,21," MS",Font_11x18,BLACK,BRRED);
+				mod_sel_MS = true ;
 			}
 			break;
 		}
@@ -1039,9 +1051,155 @@ void menu_handler(void)
 
 void device_settings(void)
 {
-	ST7735_FillScreen(GRAY);
-	ST7735_DrawString(3,0,"Device Setting",Font_11x18,WHITE, RED);
-	while(!HAL_GPIO_ReadPin(SW_T_GPIO_Port,SW_T_Pin)); // Button is released
+	while(!HAL_GPIO_ReadPin(SW_T_GPIO_Port,SW_T_Pin)); // wait Button is released
+    HAL_Delay(200);
+	btn=NO_PRESS;
+	ST7735_FillScreen(BLACK);
+
+	float scaleU_tmp = scaleU, scaleI_tmp = scaleI,
+		scaleUsp_tmp = scaleUsp, scaleIsp_tmp = scaleIsp;
+
+	ST7735_DrawString(1,2,"C>Udsp:",Font_11x18,WHITE, BLACK);
+	ptr = float_to_char(scaleU, float_for_LCD);
+	ST7735_DrawString(81,2,ptr,Font_11x18,WHITE, BLACK);
+
+	ST7735_DrawString(1,22,"C>Idsp:",Font_11x18,WHITE, BLACK);
+	ptr = float_to_char(scaleI, float_for_LCD);
+	ST7735_DrawString(81,22,ptr,Font_11x18,WHITE, BLACK);
+
+	ST7735_DrawString(1,42,"C>Ustp:",Font_11x18,WHITE, BLACK);
+	ptr = float_to_char(scaleUsp, float_for_LCD);
+	ST7735_DrawString(81,42,ptr,Font_11x18,WHITE, BLACK);
+
+	ST7735_DrawString(1,62,"C>Istp:",Font_11x18,WHITE, BLACK);
+	ptr = float_to_char(scaleIsp, float_for_LCD);
+	ST7735_DrawString(81,62,ptr,Font_11x18,WHITE, BLACK);
+
+	ST7735_DrawString(3,107,"EXIT SAVE&EXIT",Font_11x18,WHITE, BLACK);
+
+	ST7735_DrawRect(79, 0, 80, 21, WHITE);
+
+
+	while ((btn != PRESS_LONG) || ((ds_mnu_sel != EXIT)&&(ds_mnu_sel != SAVE_EXIT)))
+	{
+		if(btn == PRESS_NORM)
+		{
+			 switch(ds_mnu_sel)
+			{
+			case U_DISP:
+			{
+				ST7735_DrawRect(79, 0, 80, 21, BLACK);
+				ST7735_DrawRect(79, 20, 80, 21, WHITE);
+				ds_mnu_sel = I_DISP;
+				break;
+			}
+			case I_DISP:
+			{
+				ST7735_DrawRect(79, 20, 80, 21, BLACK);
+				ST7735_DrawRect(79, 40, 80, 21, WHITE);
+				ds_mnu_sel = U_SETP;
+				break;
+			}
+			case U_SETP:
+			{
+				ST7735_DrawRect(79, 40, 80, 21, BLACK);
+				ST7735_DrawRect(79, 60, 80, 21, WHITE);
+				ds_mnu_sel = I_SETP;
+				break;
+			}
+			case I_SETP:
+			{
+				ST7735_DrawRect(79, 60, 80, 21, BLACK);
+				ST7735_DrawRect(1, 105, 49, 21, WHITE);
+				ds_mnu_sel = EXIT;
+				break;
+			}
+			case EXIT:
+			{
+				ST7735_DrawRect(1, 105, 49, 21, BLACK);
+				ST7735_DrawRect(55, 105, 105 , 21, WHITE);
+				ds_mnu_sel = SAVE_EXIT;
+				break;
+			}
+			case SAVE_EXIT:
+			{
+				ST7735_DrawRect(55, 105, 105 , 21, BLACK);
+				ST7735_DrawRect(79, 0, 80, 21, WHITE);
+				ds_mnu_sel = U_DISP;
+				break;
+			}
+			}
+			btn=NO_PRESS;
+		}
+		if((btn == PRESS_LONG)&&
+				((ds_mnu_sel == U_DISP)||(ds_mnu_sel == I_DISP)||
+						(ds_mnu_sel == U_SETP)||(ds_mnu_sel == I_SETP)))
+																btn=NO_PRESS;
+		if(enc != NO_TRN)
+		{
+			float_for_LCD[CHAR_BUFF_SIZE]= 0;//hard stop of converted string
+			if(ds_mnu_sel == U_DISP)
+			{
+				if(enc == INC_TRN_SLOW) scaleU = scaleU+0.001;
+				if((enc == INC_TRN_NORM)||(enc == INC_TRN_NORM)) scaleU = scaleU+0.1;
+				if(enc == DEC_TRN_SLOW) scaleU = scaleU-0.001;
+				if((enc == DEC_TRN_NORM)||(enc == DEC_TRN_NORM)) scaleU = scaleU-0.1;
+				if (scaleU > SCALE_U_MAX) scaleU = SCALE_U_MAX;
+				if (scaleU < SCALE_U_MIN) scaleU = SCALE_U_MIN;
+				ptr = float_to_char(scaleU, float_for_LCD);
+				ST7735_DrawString(81,2,ptr,Font_11x18,WHITE, BLACK);
+				if (scaleU < 10.0)
+					ST7735_DrawString(136,2," ",Font_11x18,WHITE, BLACK);
+
+			}
+			if(ds_mnu_sel == I_DISP)
+			{
+				if(enc == INC_TRN_SLOW) scaleI = scaleI+0.001;
+				if((enc == INC_TRN_NORM)||(enc == INC_TRN_NORM)) scaleI = scaleI+0.1;
+				if(enc == DEC_TRN_SLOW) scaleI = scaleI-0.001;
+				if((enc == DEC_TRN_NORM)||(enc == DEC_TRN_NORM)) scaleI = scaleI-0.1;
+				if (scaleI > SCALE_I_MAX) scaleI = SCALE_I_MAX;
+				if (scaleI < SCALE_I_MIN) scaleI = SCALE_I_MIN;
+				ptr = float_to_char(scaleI, float_for_LCD);
+				if (scaleI < 1.0)
+				{
+					ptr--;
+					*ptr = '0';
+				}
+				ST7735_DrawString(81,22,ptr,Font_11x18,WHITE, BLACK);
+			}
+			if(ds_mnu_sel == U_SETP)
+			{
+				if(enc == INC_TRN_SLOW) scaleUsp = scaleUsp+0.001;
+				if((enc == INC_TRN_NORM)||(enc == INC_TRN_NORM)) scaleUsp = scaleUsp+0.1;
+				if(enc == DEC_TRN_SLOW) scaleUsp = scaleUsp-0.001;
+				if((enc == DEC_TRN_NORM)||(enc == DEC_TRN_NORM)) scaleUsp = scaleUsp-0.1;
+				if (scaleUsp > SCALE_U_SP_MAX) scaleUsp = SCALE_U_SP_MAX;
+				if (scaleUsp < SCALE_U_SP_MIN) scaleUsp = SCALE_U_SP_MIN;
+				ptr = float_to_char(scaleUsp, float_for_LCD);
+				ST7735_DrawString(81,42,ptr,Font_11x18,WHITE, BLACK);
+			}
+			if(ds_mnu_sel == I_SETP)
+			{
+				if(enc == INC_TRN_SLOW) scaleIsp = scaleIsp+0.001;
+				if((enc == INC_TRN_NORM)||(enc == INC_TRN_NORM)) scaleIsp = scaleIsp+0.1;
+				if(enc == DEC_TRN_SLOW) scaleIsp = scaleIsp-0.001;
+				if((enc == DEC_TRN_NORM)||(enc == DEC_TRN_NORM)) scaleIsp = scaleIsp-0.1;
+				if (scaleIsp > SCALE_I_SP_MAX) scaleIsp = SCALE_I_SP_MAX;
+				if (scaleIsp < SCALE_I_SP_MIN) scaleIsp = SCALE_I_SP_MIN;
+				ptr = float_to_char(scaleIsp, float_for_LCD);
+				ST7735_DrawString(81,62,ptr,Font_11x18,WHITE, BLACK);
+			}
+			enc=NO_TRN;
+		}
+	}
+	if (ds_mnu_sel == SAVE_EXIT) save_settings();
+	else
+	{
+		scaleU = scaleU_tmp; scaleI = scaleI_tmp;
+		scaleUsp = scaleUsp_tmp; scaleIsp = scaleIsp_tmp;
+	}
+	enc=NO_TRN;
 	btn=NO_PRESS;
 }
 /* USER CODE END 4 */
