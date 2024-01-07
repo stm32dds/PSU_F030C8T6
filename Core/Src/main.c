@@ -79,12 +79,11 @@ float scaleU=9.46 , scaleI=1.43; // scaling constants for U,I~9,1/1,48
 float scaleUsp=33.40, scaleIsp=218.00; //scaling const. for set points
 float constU, constI; // pre-calculated constant to speed up U&I calculation
 float outU, outI, temp_MCU;
-char float_for_LCD[CHAR_BUFF_SIZE+1];
+char float_for_LCD[CHAR_BUFF_SIZE+1]; // +1 is used for "stop string" generation
 enum EncStates enc = NO_TRN;
 enum BtnStates btn = NO_PRESS;
 enum MenuSelected mnu_sel = BL;
 enum dsMenuSelected ds_mnu_sel = U_DISP;
-
 int16_t enc_cnt = 0;
 uint8_t btn_cnt = 0;
 char* ptr; // Point to converted to char floats for LCD displaying
@@ -97,7 +96,7 @@ float iSP = 1.0; // set point for output current
 char onTd100 = '0', onTd10 = '0', onTd1 = '0',
 	 onTh10 = '0', onTh1 = '0', onTm10 = '0', onTm1 = '0',
 	 onTs10 = '0', onTs1 = '0';// On time
-uint16_t uint_spU=0, uint_spI=0;
+uint16_t uint_spU=0, uint_spI=0; // values sent to DACs
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -188,6 +187,46 @@ int main(void)
   if(!HAL_GPIO_ReadPin(SW_T_GPIO_Port,SW_T_Pin)) device_settings();//setup screen
   btn = PRESS_NORM;// to activate V menu on start
   draw_main_st(BLACK, WHITE); // Main static screen
+  if(*( uint32_t *)(SCALE_U_ADDR) != 0xFFFFFFFF)
+	  scaleU=*( float *)(SCALE_U_ADDR); // load user set scale constant
+  if(*( uint32_t *)(SCALE_I_ADDR) != 0xFFFFFFFF)
+	  scaleI=*( float *)(SCALE_I_ADDR); // load user set scale constant
+  if(*( uint32_t *)(SCALE_U_SP_ADDR) != 0xFFFFFFFF)
+	  scaleUsp=*( float *)(SCALE_U_SP_ADDR); // load user set scale constant
+  if(*( uint32_t *)(SCALE_I_SP_ADDR) != 0xFFFFFFFF)
+	  scaleIsp=*( float *)(SCALE_I_SP_ADDR); // load user set scale constant
+  if(*( uint32_t *)(MEM_SEL_ARR_ADDR) != 0xFFFFFFFF)
+	  uSP=*( float *)(MEM_SEL_ARR_ADDR); // load user set for U@M0
+  if(*( uint32_t *)(MEM_SEL_ARR_ADDR+4) != 0xFFFFFFFF)
+	  iSP=*( float *)(MEM_SEL_ARR_ADDR+4); // load user set for I@M0
+  /*BEGIN: Draw on LCD set points taken from FLASH Memory if they are valid */
+
+	ptr = float_to_char(uSP, float_for_LCD);
+	if(uSP<1)
+	{
+		ST7735_DrawString(5,84," 0",Font_11x18,WHITE,BLACK);
+		ST7735_DrawString(27,84,ptr,Font_11x18,WHITE,BLACK);
+	}
+	else
+	{
+		if(uSP<10)
+		{
+			ST7735_DrawString(5,84," ",Font_11x18,WHITE,BLACK);
+			ST7735_DrawString(16,84,ptr,Font_11x18,WHITE,BLACK);
+		}
+		else ST7735_DrawString(5,84,ptr,Font_11x18,WHITE,BLACK);
+	}
+	ST7735_DrawString( 60,84,"0V",Font_11x18,WHITE,BLACK);
+
+	ptr = float_to_char(iSP, float_for_LCD);
+	if(iSP<1)
+	{
+		ST7735_DrawString(89,84,"0",Font_11x18,WHITE,BLACK);
+		ST7735_DrawString(100,84,ptr,Font_11x18,WHITE,BLACK);
+	}
+	else ST7735_DrawString(89,84,ptr,Font_11x18,WHITE,BLACK);
+	ST7735_DrawString(144,84,"A",Font_11x18,WHITE,BLACK);
+  /*END: Draw on LCD set points taken from FLASH Memory if they are valid */
   constU = (vdd*scaleU)/4095; //calculated only once to avoid...
   constI = (vdd*scaleI)/4095; //....circular repeated calculation
   /* USER CODE END 2 */
@@ -873,8 +912,8 @@ void menu_handler(void)
 		}
 		case MEM:
 		{
-			if(!on_off) //MEM selection only when device is OFF
-			{
+			//if(!on_off) //MEM selection only when device is OFF
+			//{
 				HAL_Delay(200);
 				if(enc == INC_TRN_SLOW)
 				{
@@ -890,7 +929,7 @@ void menu_handler(void)
 				float_for_LCD[1]=0;
 				ST7735_DrawString(124,40," M",Font_11x18,BLACK,GRAY);
 				ST7735_DrawString(146 ,40,float_for_LCD,Font_11x18,BLACK,GRAY);
-			}
+			//}
 			break;
 		}
 		case BL:
@@ -1040,9 +1079,44 @@ void menu_handler(void)
 					on_off = true;
 				}
 			}
-			else
+			else // process memory pre-seting selection
 			{
-				; // process memmory presseting selection
+				if(on_off) //write SP as M to FLASH
+				{
+					save_settings(scaleU, scaleI, scaleUsp, scaleIsp, mem_sel, uSP, iSP);
+				}
+				else //get M values from FLASH
+				{
+					if(*( uint32_t *)(MEM_SEL_ARR_ADDR+(8*mem_sel)) != 0xFFFFFFFF)
+						uSP=*( float *)(MEM_SEL_ARR_ADDR+(8*mem_sel));
+					ptr = float_to_char(uSP, float_for_LCD);
+					if(uSP<1)
+					{
+						ST7735_DrawString(5,84," 0",Font_11x18,WHITE,BLACK);
+						ST7735_DrawString(27,84,ptr,Font_11x18,WHITE,BLACK);
+					}
+					else
+					{
+						if(uSP<10)
+						{
+							ST7735_DrawString(5,84," ",Font_11x18,WHITE,BLACK);
+							ST7735_DrawString(16,84,ptr,Font_11x18,WHITE,BLACK);
+						}
+						else ST7735_DrawString(5,84,ptr,Font_11x18,WHITE,BLACK);
+					}
+					ST7735_DrawString( 60,84,"0V",Font_11x18,WHITE,BLACK);
+
+					if(*( uint32_t *)(MEM_SEL_ARR_ADDR+(8*mem_sel)+4) != 0xFFFFFFFF)
+						iSP=*( float *)(MEM_SEL_ARR_ADDR+(8*mem_sel)+4);
+					ptr = float_to_char(iSP, float_for_LCD);
+					if(iSP<1)
+					{
+						ST7735_DrawString(89,84,"0",Font_11x18,WHITE,BLACK);
+						ST7735_DrawString(100,84,ptr,Font_11x18,WHITE,BLACK);
+					}
+					else ST7735_DrawString(89,84,ptr,Font_11x18,WHITE,BLACK);
+					ST7735_DrawString(144,84,"A",Font_11x18,WHITE,BLACK);
+				}
 			}
 		}
 		btn=NO_PRESS;
@@ -1193,7 +1267,8 @@ void device_settings(void)
 			enc=NO_TRN;
 		}
 	}
-	if (ds_mnu_sel == SAVE_EXIT) save_settings();
+	if (ds_mnu_sel == SAVE_EXIT)
+		save_settings(scaleU, scaleI, scaleUsp, scaleIsp, 10,0,0);
 	else
 	{
 		scaleU = scaleU_tmp; scaleI = scaleI_tmp;

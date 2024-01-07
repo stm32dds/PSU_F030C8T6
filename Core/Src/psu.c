@@ -393,7 +393,154 @@ void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float
 	old_on_off = on_off;
 }
 
-void save_settings(void)
+void save_settings(float scaleU, float scaleI, float scaleUsp, float scaleIsp,
+											int8_t mem_sel, float uSP, float iSP)
 {
-	HAL_Delay(1);
+	//	__IO uint32_t data32 = 0 , MemoryProgramStatus = 0;
+	uint32_t Address, PageError = 0;
+	uint8_t i,j;
+	float scaleU_FLASH, scaleI_FLASH, scaleUsp_FLASH, scaleIsp_FLASH;
+	float mem_sel_img_FLASH[10][2]; // first is set point for U, second for I
+	static FLASH_EraseInitTypeDef EraseInitStruct; // Variable used for Erase procedure
+
+	// Create image of current flash memory
+	scaleU_FLASH = *( float *)(SCALE_U_ADDR);
+	scaleI_FLASH = *( float *)(SCALE_I_ADDR);
+	scaleUsp_FLASH = *( float *)(SCALE_U_SP_ADDR);
+	scaleIsp_FLASH = *( float *)(SCALE_I_SP_ADDR);
+	Address = MEM_SEL_ARR_ADDR;
+	for(i=0; i<10; i++)
+	{
+		for(j=0;j<2; j++)
+		{
+			mem_sel_img_FLASH[i][j]=*( float *)(Address);
+			Address = Address+4;
+		}
+	}
+	HAL_FLASH_Unlock();
+	// Fill EraseInit structure
+	EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+	EraseInitStruct.PageAddress = FLASH_USER_START_ADDR;
+	EraseInitStruct.NbPages = (FLASH_USER_END_ADDR - FLASH_USER_START_ADDR) / FLASH_PAGE_SIZE;
+	//Erase flash page 63
+	if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+	{	//PageError will contain the faulty page and then to know the code error on this page,
+		//user can call function 'HAL_FLASH_GetError()'
+		while (1)   // Infinite loop
+		{
+			ST7735_FillScreen(RED);
+			HAL_Delay(500);
+			ST7735_DrawString(0,52,"Error on FLASH erasing!",Font_11x18,WHITE, RED);
+			HAL_Delay(1000);
+		}
+	}
+    //Modify flash image
+	if(mem_sel > 9)//selected to modify scale coefficients
+	{
+		scaleU_FLASH = scaleU; scaleI_FLASH =scaleI;
+		scaleUsp_FLASH = scaleUsp; scaleIsp_FLASH = scaleIsp;
+	}
+	else //selected to modify work memories settings
+	{
+		mem_sel_img_FLASH[mem_sel][0] = uSP;
+		mem_sel_img_FLASH[mem_sel][1] = iSP;
+	}
+	//Write image to flash memory
+	if (HAL_FLASH_Program
+			  (FLASH_TYPEPROGRAM_WORD, SCALE_U_ADDR, *(uint32_t*)&scaleU_FLASH) != HAL_OK)
+		  	  	  err_flash_writing();
+	if (HAL_FLASH_Program
+			  (FLASH_TYPEPROGRAM_WORD, SCALE_I_ADDR, *(uint32_t*)&scaleI_FLASH) != HAL_OK)
+		  	  	  err_flash_writing();
+	if (HAL_FLASH_Program
+			  (FLASH_TYPEPROGRAM_WORD, SCALE_U_SP_ADDR, *(uint32_t*)&scaleUsp_FLASH) != HAL_OK)
+		  	  	  err_flash_writing();
+	if (HAL_FLASH_Program
+			  (FLASH_TYPEPROGRAM_WORD, SCALE_I_SP_ADDR, *(uint32_t*)&scaleIsp_FLASH) != HAL_OK)
+		  	  	  err_flash_writing();
+	Address = MEM_SEL_ARR_ADDR;
+	for(i=0; i<10; i++)
+	{
+		for(j=0;j<2; j++)
+		{
+			if (HAL_FLASH_Program
+					(FLASH_TYPEPROGRAM_WORD, Address,
+							*(uint32_t*)&mem_sel_img_FLASH[i][j]) != HAL_OK)
+					  	  	  	  	  	  	  	  	  	  	  	  err_flash_writing();
+			Address = Address+4;
+		}
+	}
+	HAL_FLASH_Lock();
+}
+
+//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP1_ADDR, *(uint32_t*)&aT);
+//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP2_ADDR, *(uint32_t*)&bT);
+//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP3_ADDR, *(uint32_t*)&cT);
+//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP4_ADDR, *(uint32_t*)&dT);
+
+//Address = FLASH_USER_START_ADDR;
+
+	//while (Address < FLASH_USER_END_ADDR)
+	//{
+	//  if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address, DATA_32) == HAL_OK)
+	//  {
+	  //    Address = Address + 4;
+	// }
+	//  else
+	//  {
+    /* Error occurred while writing data in Flash memory.
+       User can add here some code to deal with this error */
+	//    while (1)
+	//    {
+      /* Make LED2 blink (100ms on, 2s off) to indicate error in Write operation */
+	//        HAL_Delay(1);
+	//    }
+	//  }
+	//}
+
+
+
+//	Temp1 = *( float *)(TEMP1_ADDR);
+//	Temp2 = *( float *)(TEMP2_ADDR);
+//	Temp3 = *( float *)(TEMP3_ADDR);
+//	Temp4 = *( float *)(TEMP4_ADDR);
+
+//Address = FLASH_USER_START_ADDR;
+//MemoryProgramStatus = 0x0;
+
+//while (Address < FLASH_USER_END_ADDR)
+//{
+//  data32 = *(__IO uint32_t *)Address;
+
+//  if (data32 != DATA_32)
+//  {
+//    MemoryProgramStatus++;
+//  }
+//  Address = Address + 4;
+//}
+
+/*Check if there is an issue to program data*/
+//if (MemoryProgramStatus == 0)
+//{
+  /* No error detected. Switch on LED2*/
+//    HAL_Delay(1);
+//}
+//else
+//{
+  /* Error detected. LED2 will blink with 1s period */
+//  while (1)
+//  {
+//      HAL_Delay(1);
+//  }
+//}
+
+void err_flash_writing(void)
+{
+	while (1)   // Infinite loop
+	{
+		ST7735_FillScreen(BLUE);
+		HAL_Delay(500);
+		ST7735_DrawString(0,52,"Error on FLASH writing!",Font_11x18,WHITE, BLUE);
+		HAL_Delay(1000);
+	}
 }
