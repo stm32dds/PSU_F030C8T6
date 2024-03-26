@@ -15,7 +15,7 @@
 
 #define ADDR_FLASH_PAGE_63    ((uint32_t)0x0800FC00) /* Base @ of Page 63, 1 Kbyte */
 
-#define FLASH_USER_START_ADDR  ADDR_FLASH_PAGE_63    /* Start @ of user Flash area */
+#define FLASH_USER_START_ADDR  ADDR_FLASH_PAGE_63    /* Start @ of user Flash area  */
 #define FLASH_USER_END_ADDR     ADDR_FLASH_PAGE_63 + FLASH_PAGE_SIZE   /* End @ of user Flash area */
 
 #define SCALE_U_ADDR FLASH_USER_START_ADDR

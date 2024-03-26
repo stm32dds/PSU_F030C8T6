@@ -176,8 +176,7 @@ void get_adcs(volatile uint16_t adc_RAW[], float *temp_MCU,
 	        }
 	    }
 		  *outI = constI*mostFrequentI;
-		  *outU = constU*mostFrequentU-(0.18*(*outI));
-		  //*outU = constU*mostFrequentU;
+		  *outU = constU*mostFrequentU-(0.18*(*outI)); // 0.18 is shunt resistor value
 }
 
 char * float_to_char(float x, char *p)
@@ -216,7 +215,7 @@ void draw_main_st(COLOR backgr, COLOR front)
 	ST7735_DrawString(5,29," 0.000A",Font_16x26,YELLOW, backgr);
 	ST7735_DrawString(5,55,"000.00W",Font_16x26,YELLOW, backgr);
 	ST7735_DrawString(124,2,"OFF",Font_11x18,WHITE, RED);
-	ST7735_DrawString(124,21," SL",Font_11x18,BLACK,GBLUE);
+	ST7735_DrawString(124,21," CV",Font_11x18,BLACK,GBLUE);
 	ST7735_DrawString(124,40," M0",Font_11x18,BLACK,GRAY);
 	ST7735_DrawString(124,59,"LGT",Font_11x18,WHITE,MAGENTA);
 	ST7735_DrawString(5,84,"05.000V",Font_11x18,front,backgr);
@@ -396,7 +395,6 @@ void draw_main_dy(char* ptr, char* float_for_LCD, bool on_off, float outU, float
 void save_settings(float scaleU, float scaleI, float scaleUsp, float scaleIsp,
 											int8_t mem_sel, float uSP, float iSP)
 {
-	//	__IO uint32_t data32 = 0 , MemoryProgramStatus = 0;
 	uint32_t Address, PageError = 0;
 	uint8_t i,j;
 	float scaleU_FLASH, scaleI_FLASH, scaleUsp_FLASH, scaleIsp_FLASH;
@@ -472,67 +470,6 @@ void save_settings(float scaleU, float scaleI, float scaleUsp, float scaleIsp,
 	}
 	HAL_FLASH_Lock();
 }
-
-//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP1_ADDR, *(uint32_t*)&aT);
-//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP2_ADDR, *(uint32_t*)&bT);
-//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP3_ADDR, *(uint32_t*)&cT);
-//	HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, TEMP4_ADDR, *(uint32_t*)&dT);
-
-//Address = FLASH_USER_START_ADDR;
-
-	//while (Address < FLASH_USER_END_ADDR)
-	//{
-	//  if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, Address, DATA_32) == HAL_OK)
-	//  {
-	  //    Address = Address + 4;
-	// }
-	//  else
-	//  {
-    /* Error occurred while writing data in Flash memory.
-       User can add here some code to deal with this error */
-	//    while (1)
-	//    {
-      /* Make LED2 blink (100ms on, 2s off) to indicate error in Write operation */
-	//        HAL_Delay(1);
-	//    }
-	//  }
-	//}
-
-
-
-//	Temp1 = *( float *)(TEMP1_ADDR);
-//	Temp2 = *( float *)(TEMP2_ADDR);
-//	Temp3 = *( float *)(TEMP3_ADDR);
-//	Temp4 = *( float *)(TEMP4_ADDR);
-
-//Address = FLASH_USER_START_ADDR;
-//MemoryProgramStatus = 0x0;
-
-//while (Address < FLASH_USER_END_ADDR)
-//{
-//  data32 = *(__IO uint32_t *)Address;
-
-//  if (data32 != DATA_32)
-//  {
-//    MemoryProgramStatus++;
-//  }
-//  Address = Address + 4;
-//}
-
-/*Check if there is an issue to program data*/
-//if (MemoryProgramStatus == 0)
-//{
-  /* No error detected. Switch on LED2*/
-//    HAL_Delay(1);
-//}
-//else
-//{
-  /* Error detected. LED2 will blink with 1s period */
-//  while (1)
-//  {
-//      HAL_Delay(1);
-//  }
-//}
 
 void err_flash_writing(void)
 {

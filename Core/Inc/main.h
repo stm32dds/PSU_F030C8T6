@@ -91,6 +91,10 @@ void Error_Handler(void);
 #define V_DAC0_GPIO_Port GPIOB
 #define V_DAC6_Pin GPIO_PIN_2
 #define V_DAC6_GPIO_Port GPIOB
+#define I2C2_Reserved_Pin GPIO_PIN_10
+#define I2C2_Reserved_GPIO_Port GPIOB
+#define I2C2_ReservedB11_Pin GPIO_PIN_11
+#define I2C2_ReservedB11_GPIO_Port GPIOB
 #define V_DAC7_Pin GPIO_PIN_12
 #define V_DAC7_GPIO_Port GPIOB
 #define V_DAC8_Pin GPIO_PIN_13
@@ -109,6 +113,8 @@ void Error_Handler(void);
 #define V_DAC2_GPIO_Port GPIOA
 #define V_DAC1_Pin GPIO_PIN_12
 #define V_DAC1_GPIO_Port GPIOA
+#define Not_used_Pin GPIO_PIN_6
+#define Not_used_GPIO_Port GPIOF
 #define I_DAC0_Pin GPIO_PIN_15
 #define I_DAC0_GPIO_Port GPIOA
 #define I_DAC1_Pin GPIO_PIN_3
@@ -117,6 +123,10 @@ void Error_Handler(void);
 #define SW_A_GPIO_Port GPIOB
 #define SW_B_Pin GPIO_PIN_5
 #define SW_B_GPIO_Port GPIOB
+#define I2C1_Reserved_Pin GPIO_PIN_6
+#define I2C1_Reserved_GPIO_Port GPIOB
+#define I2C1_ReservedB7_Pin GPIO_PIN_7
+#define I2C1_ReservedB7_GPIO_Port GPIOB
 #define I_DAC2_Pin GPIO_PIN_8
 #define I_DAC2_GPIO_Port GPIOB
 #define I_DAC6_Pin GPIO_PIN_9

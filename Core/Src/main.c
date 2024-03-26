@@ -22,7 +22,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "st7735.h"
-//#include "fonts.h"
 #include "psu.h"
 /* USER CODE END Includes */
 
@@ -60,9 +59,6 @@ enum dsMenuSelected {U_DISP,I_DISP, U_SETP, I_SETP, EXIT, SAVE_EXIT};
 ADC_HandleTypeDef hadc;
 DMA_HandleTypeDef hdma_adc;
 
-I2C_HandleTypeDef hi2c1;
-I2C_HandleTypeDef hi2c2;
-
 RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
@@ -88,7 +84,7 @@ int16_t enc_cnt = 0;
 uint8_t btn_cnt = 0;
 char* ptr; // Point to converted to char floats for LCD displaying
 bool on_off = false; // disable/enable power at output 0/1
-bool mod_sel_MS = false; // device is slave/device is master 0/1
+bool mod_sel_CI = false; // device is in constant voltage/constant current mode 0/1
 int8_t mem_sel = 0; // selected memory set from 0 to 9
 int16_t lcd_pwm_bl = 200; //max value
 float uSP = 5.0; // set point for output voltage
@@ -106,8 +102,6 @@ static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_ADC_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_I2C2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_RTC_Init(void);
@@ -134,7 +128,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-     HAL_Init();
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -153,8 +147,6 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM1_Init();
   MX_ADC_Init();
-  MX_I2C1_Init();
-  MX_I2C2_Init();
   MX_TIM3_Init();
   MX_TIM6_Init();
   MX_RTC_Init();
@@ -180,6 +172,7 @@ int main(void)
 
   /* Start Back Light at max Level=200 */
   __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, lcd_pwm_bl);
+
 
 //  LCD_Init( lcd_ScanDir ); // LCD initialization
   ST7735_Init();
@@ -241,29 +234,19 @@ int main(void)
  			  &onTs10, &onTs1, on_off);
  	  draw_main_dy(ptr, float_for_LCD, on_off, outU, outI, onTd100, onTd10, onTd1, onTh10,
 			  onTh1, onTm10, onTm1, onTs10, onTs1, temp_MCU);
- 	  if(temp_MCU < 85.0) //no over hating
+ 	  if(temp_MCU < 85.0) //no over heating
 	  {
- 		  if(!mod_sel_MS) // device is in slave mode
+ 		  uint_spI = (uint16_t)(scaleIsp   * iSP);
+ 		  i_DAC10_Set(uint_spI);
+ 		  if(on_off) // output is POWERED
  		  {
- 			  uint_spI = (uint16_t)(scaleIsp   * iSP);
- 			  i_DAC10_Set(uint_spI);
- 			  if(on_off) // output is POWERED
- 			  {
- 				  uint_spU = (uint16_t)(scaleUsp * uSP);
- 				  v_DAC10_Set(uint_spU);
+ 			uint_spU = (uint16_t)(scaleUsp * uSP);
+ 			v_DAC10_Set(uint_spU);
 
- 			  }
- 			  else // output is UNPOWERED
- 			  {
- 				  v_DAC10_Set(0);
- 				  //  i_DAC10_Set(0);
- 			  }
  		  }
- 		  else //constant current mode -NOT IMPLEMENTED YET!!!!
+ 		  else // output is UNPOWERED
  		  {
- 			  // just to go to CV if Wrong Selected by UI
- 			  //subject of future implementation
- 			 mod_sel_MS= false;
+ 			 v_DAC10_Set(0);
  		  }
 	  }
  	  else //over heating, output UNPOWERED
@@ -317,8 +300,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_RTC;
-  PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
@@ -393,102 +375,6 @@ static void MX_ADC_Init(void)
   /* USER CODE BEGIN ADC_Init 2 */
 
   /* USER CODE END ADC_Init 2 */
-
-}
-
-/**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x2000090E;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Analogue filter
-  */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Digital filter
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief I2C2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C2_Init(void)
-{
-
-  /* USER CODE BEGIN I2C2_Init 0 */
-
-  /* USER CODE END I2C2_Init 0 */
-
-  /* USER CODE BEGIN I2C2_Init 1 */
-
-  /* USER CODE END I2C2_Init 1 */
-  hi2c2.Instance = I2C2;
-  hi2c2.Init.Timing = 0x20303E5D;
-  hi2c2.Init.OwnAddress1 = 64;
-  hi2c2.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c2.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c2.Init.OwnAddress2 = 0;
-  hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
-  hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Analogue filter
-  */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Digital filter
-  */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C2_Init 2 */
-
-  /* USER CODE END I2C2_Init 2 */
 
 }
 
@@ -833,6 +719,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : I2C2_Reserved_Pin I2C2_ReservedB11_Pin I2C1_Reserved_Pin I2C1_ReservedB7_Pin */
+  GPIO_InitStruct.Pin = I2C2_Reserved_Pin|I2C2_ReservedB11_Pin|I2C1_Reserved_Pin|I2C1_ReservedB7_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Not_used_Pin PF7 */
+  GPIO_InitStruct.Pin = Not_used_Pin|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -900,36 +798,33 @@ void menu_handler(void)
 		{
 			if(enc == INC_TRN_SLOW)
 			{
-				ST7735_DrawString(124,21," SL",Font_11x18,BLACK,GBLUE);
-				mod_sel_MS = false;
+				ST7735_DrawString(124,21," CV",Font_11x18,BLACK,GBLUE);
+				mod_sel_CI = false;
 			}
 			if(enc == DEC_TRN_SLOW)
 			{
-				ST7735_DrawString(124,21," MS",Font_11x18,BLACK,BRRED);
-				mod_sel_MS = true ;
+				ST7735_DrawString(124,21," CI",Font_11x18,BLACK,BRRED);
+				mod_sel_CI = true ;
 			}
 			break;
 		}
 		case MEM:
 		{
-			//if(!on_off) //MEM selection only when device is OFF
-			//{
-				HAL_Delay(200);
-				if(enc == INC_TRN_SLOW)
-				{
-					mem_sel=mem_sel+1;
-					if (mem_sel > 9) mem_sel=9;
-				}
-				if(enc == DEC_TRN_SLOW)
-				{
-					mem_sel=mem_sel-1;
-					if (mem_sel < 0) mem_sel=0;
-				}
-				float_for_LCD[0]=0x30+mem_sel;
-				float_for_LCD[1]=0;
-				ST7735_DrawString(124,40," M",Font_11x18,BLACK,GRAY);
-				ST7735_DrawString(146 ,40,float_for_LCD,Font_11x18,BLACK,GRAY);
-			//}
+			HAL_Delay(200);
+			if(enc == INC_TRN_SLOW)
+			{
+				mem_sel=mem_sel+1;
+				if (mem_sel > 9) mem_sel=9;
+			}
+			if(enc == DEC_TRN_SLOW)
+			{
+				mem_sel=mem_sel-1;
+				if (mem_sel < 0) mem_sel=0;
+			}
+			float_for_LCD[0]=0x30+mem_sel;
+			float_for_LCD[1]=0;
+			ST7735_DrawString(124,40," M",Font_11x18,BLACK,GRAY);
+			ST7735_DrawString(146 ,40,float_for_LCD,Font_11x18,BLACK,GRAY);
 			break;
 		}
 		case BL:
@@ -975,7 +870,6 @@ void menu_handler(void)
 				else ST7735_DrawString(5,84,ptr,Font_11x18,WHITE,BLACK);
 			}
 			ST7735_DrawString( 60,84,"0V",Font_11x18,WHITE,BLACK);
-//			ST7735_DrawString( 71,84,"V",Font_11x18,WHITE,BLACK);
 			break;
 		}
 		case I:
@@ -1017,7 +911,7 @@ void menu_handler(void)
 				mnu_sel = MODE;
 				break;
 			}
-			case MODE:  //Constant U or constant I
+			case MODE:  //Master or slave in future I hope
 			{
 				ST7735_DrawRect
 					(123,20, 35, 20, BLACK);
@@ -1277,6 +1171,7 @@ void device_settings(void)
 	enc=NO_TRN;
 	btn=NO_PRESS;
 }
+
 /* USER CODE END 4 */
 
 /**
