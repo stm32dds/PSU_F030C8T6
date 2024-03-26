@@ -232,6 +232,15 @@ static void ST7735_WriteChar(uint16_t x, uint16_t y, char ch, FontDef font, uint
     for(i = 0; i < font.height; i++)
     {
         b = font.data[(ch - 32) * font.height + i];
+        if(font.width == 16) //re indexing for shorted large font
+        {
+        	if(ch == 'A') ch=':';
+        	if(ch == 'V') ch=';';
+        	if(ch == 'W') ch='<';
+        	if(ch == '.') ch='=';
+        	if(ch == ' ') ch='>';
+        	b = font.data[(ch - 48) * font.height + i];
+        }
         for(j = 0; j < font.width; j++)
         {
             if((b << j) & 0x8000)
